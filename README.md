@@ -10,7 +10,7 @@
 针对 **雷鸟（FFALCON）/ TCL** 电视做过实测：这类固件禁掉了 `adb install`，本 App 用电视自带的
 「多屏互动」通道把 APK 推过去安装。
 
-Android 5.0+ · 单 APK 3.2 MB（**内置 Aerial guard 包** + 电视端对讲器）· MIT
+Android 8.0+ · 单 APK 12.4 MB（**内置 Aerial guard 包** + 电视端助手）· MIT
 
 </div>
 
