@@ -18,12 +18,17 @@ Android 5.0+ · 单 APK 3.2 MB（**内置 Aerial guard 包** + 电视端对讲�
 
 ## 截图
 
-| 主界面 · 设备卡片 | 对讲 · 按住说话 |
-|---|---|
-| ![主界面](docs/screenshots/intercom-install-error.jpg) | ![对讲](docs/screenshots/intercom-dialog.jpg) |
+| 首页 · 极光 | 首页 · 夜幕 | 更多功能 |
+|---|---|---|
+| ![首页](docs/screenshots/05-home-aurora.jpg) | ![首页深色](docs/screenshots/04-home-dark.jpg) | ![更多](docs/screenshots/02-more-grid.jpg) |
 
-> 左图那张「读取对讲端失败：intercom-tv.apk」是 v0.7.2 之前的构建 bug（`aapt2 link` 漏了 `-A assets`），
-> 现在对讲端已经打进 APK，不会再出现；保留这张图是为了让遇到同样报错的人能对上号。
+| 遥控（红外） | 互动 · 弹幕 | 应用管理 |
+|---|---|---|
+| ![遥控](docs/screenshots/03-remote.jpg) | ![弹幕](docs/screenshots/06-danmaku.jpg) | ![应用](docs/screenshots/07-apps.jpg) |
+
+| 电视端桌面管理（Aerial 网页） |
+|---|
+| ![电视端](docs/screenshots/01-tv-homescreen.jpg) |
 
 ## 适用机型
 
@@ -200,29 +205,6 @@ android/app/src/main/java/com/aerial/buddy/
 ## License
 
 [MIT](LICENSE)
-
-## 界面
-
-| 首页（极光主题） | 首页（夜幕主题） | 更多功能 |
-|---|---|---|
-| ![首页](docs/screenshots/05-home-aurora.jpg) | ![首页-深色](docs/screenshots/04-home-dark.jpg) | ![更多](docs/screenshots/02-more-grid.jpg) |
-
-| 遥控（红外） | 互动 · 弹幕 | 应用管理 |
-|---|---|---|
-| ![遥控](docs/screenshots/03-remote.jpg) | ![弹幕](docs/screenshots/06-danmaku.jpg) | ![应用](docs/screenshots/07-apps.jpg) |
-
-| 电视端桌面管理（Aerial 网页） |
-|---|
-| ![电视端](docs/screenshots/01-tv-homescreen.jpg) |
-
-## 下载
-
-最新版本：**v0.51.0**
-
-- 手机端：[aerial-buddy-v0.51.0.apk](https://github.com/huli2008/aerial-buddy/releases/download/v0.51.0/aerial-buddy-v0.51.0.apk)
-- 电视端助手（可选，弹幕/同屏/应用列表需要）：[intercom-tv-v0.7.3.apk](https://github.com/huli2008/aerial-buddy/releases/download/v0.51.0/intercom-tv-v0.7.3.apk)
-
-更新内容见 [RELEASE_NOTES-v0.51.0.md](RELEASE_NOTES-v0.51.0.md)。
 
 ## 兼容性
 
