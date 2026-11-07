@@ -10,11 +10,20 @@
 针对 **雷鸟（FFALCON）/ TCL** 电视做过实测：这类固件禁掉了 `adb install`，本 App 用电视自带的
 「多屏互动」通道把 APK 推过去安装。
 
-Android 5.0+ · 单 APK 375 KB · MIT
+Android 5.0+ · 单 APK 474 KB（含 98 KB 电视端对讲器）· MIT
 
 </div>
 
 ---
+
+## 截图
+
+| 主界面 · 设备卡片 | 对讲 · 按住说话 |
+|---|---|
+| ![主界面](docs/screenshots/intercom-install-error.jpg) | ![对讲](docs/screenshots/intercom-dialog.jpg) |
+
+> 左图那张「读取对讲端失败：intercom-tv.apk」是 v0.7.2 之前的构建 bug（`aapt2 link` 漏了 `-A assets`），
+> 现在对讲端已经打进 APK，不会再出现；保留这张图是为了让遇到同样报错的人能对上号。
 
 ## 适用机型
 
