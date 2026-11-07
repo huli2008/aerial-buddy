@@ -7,6 +7,7 @@ public class Device {
     public String url;      // e.g. http://192.168.8.192:8790/bjsaawba/
     public String status;   // last status text
     public int dot;         // 0 offline, 1 online, 2 unknown
+    public boolean pending; // found by scan, still needs the QR token
 
     public String host() {
         String u = url == null ? "" : url;

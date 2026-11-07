@@ -37,15 +37,15 @@ Android 5.0+ · 单 APK 374 KB · MIT
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.2.0.apk](releases/aerial-buddy-v0.2.0.apk)**（约 374 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.3.0.apk](releases/aerial-buddy-v0.3.0.apk)**（约 375 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.2.0.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.3.0.apk>
 
 ## 使用
 
 1. 手机与电视连同一 Wi-Fi；
-2. 打开 App →「扫描」找到电视（或直接「扫码绑定」）；
-3. 扫电视「个性化」页的二维码 → 自动绑定并进入管理页；
+2. 点「扫描」：直接在列表里加出找到的电视（无需选菜单）；
+3. 点这台电视的卡片 → 拍电视「个性化」页的二维码 → 自动授权并进入管理页；
 4. 管理页里「添加照片 / 添加视频」可直接从手机相册上传（WebView 文件选择已实现）；
 5. 回列表：点卡片进管理页；「壁纸」换壁纸；「安装 APK」推送安装。
 

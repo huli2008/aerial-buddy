@@ -243,7 +243,14 @@ public class MainActivity extends Activity {
         acts.addView(chip("刷新", () -> refresh(d)));
         card.addView(acts);
 
-        card.setOnClickListener(v -> openPanel(d));
+        card.setOnClickListener(v -> {
+            if (d.pending) {
+                pendingScanIp = d.ip();
+                captureQr();
+            } else {
+                openPanel(d);
+            }
+        });
         card.setOnLongClickListener(v -> {
             confirmDelete(d);
             return true;
@@ -292,6 +299,12 @@ public class MainActivity extends Activity {
     }
 
     private void refresh(final Device d) {
+        if (d.pending) {
+            d.status = "待授权：点一下扫电视二维码";
+            d.dot = 2;
+            render();
+            return;
+        }
         d.status = "连接中…";
         new Thread(() -> {
             String text;
@@ -430,14 +443,21 @@ public class MainActivity extends Activity {
                     toast("没发现 Aerial 电视：确认电视开机、与本机同一 Wi-Fi");
                     return;
                 }
-                new AlertDialog.Builder(MainActivity.this)
-                        .setTitle("发现 " + ips.size() + " 台，点一台再扫它的二维码")
-                        .setItems(ips.toArray(new String[0]), (d2, which) -> {
-                            pendingScanIp = ips.get(which);
-                            chooseScanSource();
-                        })
-                        .setNegativeButton("关闭", null)
-                        .show();
+                int added = 0;
+                for (String ip : ips) {
+                    if (findByIp(ip) != null) continue;
+                    Device d = new Device();
+                    d.id = String.valueOf(System.currentTimeMillis() + added);
+                    d.name = "电视 " + ip.substring(ip.lastIndexOf('.') + 1);
+                    d.url = "http://" + ip + ":8790/";
+                    d.pending = true;
+                    devices.add(d);
+                    added++;
+                }
+                Store.save(MainActivity.this, devices);
+                render();
+                toast(added == 0 ? ("发现 " + ips.size() + " 台，都已在列表里")
+                        : ("已添加 " + added + " 台，点一下扫二维码完成授权"));
             }
 
             @Override
@@ -448,15 +468,14 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** 扫码绑定：直接开相机，不弹菜单；相机不可用时退回相册。 */
     private void chooseScanSource() {
-        String[] items = {"拍照扫描", "从相册选择", "手动输入地址"};
-        new AlertDialog.Builder(this)
-                .setItems(items, (dlg, which) -> {
-                    if (which == 0) captureQr();
-                    else if (which == 1) pickQr();
-                    else showUrlDialog(null);
-                })
-                .show();
+        captureQr();
+    }
+
+    private Device findByIp(String ip) {
+        for (Device d : devices) if (ip.equals(d.ip())) return d;
+        return null;
     }
 
     private void pickQr() {
@@ -475,25 +494,60 @@ public class MainActivity extends Activity {
             i.putExtra(MediaStore.EXTRA_OUTPUT, cameraOutput);
             startActivityForResult(i, REQ_QR_CAMERA);
         } catch (Exception e) {
-            toast("无法调用相机：" + e.getMessage());
+            toast("相机不可用，改为从相册选二维码");
+            pickQr();
         }
     }
 
+    /** 手动输入只要 IP：端口与路径是固定的，不显示也不需要填。 */
     private void showUrlDialog(final String preset) {
         EditText e = new EditText(this);
-        e.setHint("http://192.168.8.192:8790/bjsaawba/");
+        e.setHint("192.168.8.192");
         e.setText(preset == null ? "" : preset);
         e.setSingleLine(true);
         e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         int p = dp(20);
         e.setPadding(p, dp(10), p, dp(10));
         new AlertDialog.Builder(this)
-                .setTitle("电视管理地址")
-                .setMessage("二维码下面的那串地址，含 8790 端口和随机 token")
+                .setTitle("电视 IP")
                 .setView(e)
                 .setNegativeButton("取消", null)
-                .setPositiveButton("绑定", (dlg, w) -> bind(Qr.toBaseUrl(e.getText().toString())))
+                .setPositiveButton("添加", (dlg, w) -> addByIp(e.getText().toString()))
                 .show();
+    }
+
+    private void addByIp(String raw) {
+        String h = raw == null ? "" : raw.trim();
+        h = h.replace("http://", "").replace("https://", "");
+        int slash = h.indexOf('/');
+        if (slash >= 0) h = h.substring(0, slash);
+        int colon = h.indexOf(':');
+        if (colon > 0) h = h.substring(0, colon);
+        if (!h.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            toast("请输入电视 IP，例如 192.168.8.192");
+            return;
+        }
+        Device known = findByIp(h);
+        if (known != null) {
+            if (known.pending) {
+                pendingScanIp = h;
+                captureQr();
+            } else {
+                toast("这台电视已经在列表里");
+                openPanel(known);
+            }
+            return;
+        }
+        Device d = new Device();
+        d.id = String.valueOf(System.currentTimeMillis());
+        d.name = "电视 " + h.substring(h.lastIndexOf('.') + 1);
+        d.url = "http://" + h + ":8790/";
+        d.pending = true;
+        devices.add(d);
+        Store.save(this, devices);
+        render();
+        pendingScanIp = h;
+        captureQr();
     }
 
     private void bind(String url) {
@@ -501,27 +555,33 @@ public class MainActivity extends Activity {
             toast("地址为空");
             return;
         }
+        String hostPart = url.replace("http://", "").replace("https://", "");
+        int slash = hostPart.indexOf('/');
+        if (slash > 0) hostPart = hostPart.substring(0, slash);
+        String ip = hostPart.contains(":") ? hostPart.substring(0, hostPart.indexOf(':')) : hostPart;
+
         for (Device d : devices) {
-            if (d.base().equals(url)) {
+            if (!d.pending && d.base().equals(url)) {
                 pendingScanIp = null;
                 toast("这台电视已经绑定过了");
+                openPanel(d);
                 return;
             }
         }
-        if (pendingScanIp != null && !url.contains(pendingScanIp)) {
-            toast("注意：绑定的地址指向 " + url.replace("http://", "").split("/")[0]
-                    + "，不是刚才扫描到的 " + pendingScanIp);
+        Device target = findByIp(ip);
+        if (target == null) {
+            target = new Device();
+            target.id = String.valueOf(System.currentTimeMillis());
+            target.name = "电视 " + ip.substring(ip.lastIndexOf('.') + 1);
+            devices.add(target);
         }
-        Device d = new Device();
-        d.id = String.valueOf(System.currentTimeMillis());
-        d.name = "电视 " + d.id.substring(Math.max(0, d.id.length() - 3));
-        d.url = url;
+        target.url = url;
+        target.pending = false;
         pendingScanIp = null;
-        devices.add(d);
         Store.save(this, devices);
         render();
-        refresh(d);
-        openPanel(d);
+        refresh(target);
+        openPanel(target);
     }
 
     @Override
