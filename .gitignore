@@ -1,0 +1,16 @@
+# build output
+android/build/
+android/.gradle/
+android/local.properties
+dist/
+
+# signing material — never commit
+*.jks
+*.keystore
+
+# editor / OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
