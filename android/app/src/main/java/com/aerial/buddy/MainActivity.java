@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private Uri cameraOutput;
     private Device installing;
     private String pendingScanIp;
+    private final Intercom intercom = new Intercom();
 
     @Override
     protected void onCreate(Bundle b) {
@@ -239,6 +240,7 @@ public class MainActivity extends Activity {
         acts.setPadding(0, dp(9), 0, 0);
         acts.addView(chip("壁纸", () -> showWallpapers(d)));
         acts.addView(chip("应用", () -> showApps(d)));
+        acts.addView(chip("对讲", () -> showIntercom(d)));
         acts.addView(chip("管理", () -> openPanel(d)));
         acts.addView(chip("安装 APK", () -> startInstall(d)));
         acts.addView(chip("刷新", () -> refresh(d)));
@@ -468,6 +470,115 @@ public class MainActivity extends Activity {
                 refresh(d);
             });
         }, "uninstall").start();
+    }
+
+    /** 对讲：电视端小助手负责播放，手机按住说话。 */
+    private void showIntercom(final Device d) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p = dp(20);
+        box.setPadding(p, dp(12), p, dp(4));
+
+        TextView tip = new TextView(this);
+        tip.setText("按住下面的按钮说话，电视喇叭会同步出声。\n首次使用需在电视上装一个「对讲端」（约 40 KB）。");
+        tip.setTextColor(theme.dim);
+        tip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+        box.addView(tip);
+
+        final TextView hold = new TextView(this);
+        hold.setText("按住说话");
+        hold.setGravity(Gravity.CENTER);
+        hold.setTextColor(theme.accentText);
+        hold.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        GradientDrawable hb = new GradientDrawable();
+        hb.setCornerRadius(dp(18));
+        hb.setColor(theme.accent);
+        hold.setBackground(hb);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(96));
+        hlp.topMargin = dp(14);
+        box.addView(hold, hlp);
+
+        final TextView helper = new TextView(this);
+        helper.setText("① 装对讲端到电视");
+        helper.setGravity(Gravity.CENTER);
+        helper.setTextColor(theme.text);
+        helper.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        GradientDrawable gb = new GradientDrawable();
+        gb.setCornerRadius(dp(14));
+        gb.setColor(theme.card);
+        gb.setStroke(dp(1), theme.cardStroke);
+        helper.setBackground(gb);
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        glp.topMargin = dp(10);
+        box.addView(helper, glp);
+
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle("对讲 · " + d.name)
+                .setView(box)
+                .setNegativeButton("关闭", (d2, w) -> intercom.stop())
+                .create();
+
+        helper.setOnClickListener(v -> {
+            dlg.dismiss();
+            installHelper(d);
+        });
+
+        hold.setOnTouchListener((v, ev) -> {
+            switch (ev.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    if (!checkMic()) return true;
+                    String err = intercom.start(d.ip());
+                    if (err != null) {
+                        toast(err);
+                    } else {
+                        hold.setText("正在说话…松开结束");
+                        hold.setBackgroundColor(0xFFB23B3B);
+                    }
+                    return true;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    intercom.stop();
+                    hold.setText("按住说话");
+                    GradientDrawable bg = new GradientDrawable();
+                    bg.setCornerRadius(dp(18));
+                    bg.setColor(theme.accent);
+                    hold.setBackground(bg);
+                    return true;
+                default:
+                    return false;
+            }
+        });
+
+        dlg.show();
+    }
+
+    private boolean checkMic() {
+        if (android.os.Build.VERSION.SDK_INT < 23) return true;
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+        requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 71);
+        toast("已请求麦克风权限，允许后再按住说话");
+        return false;
+    }
+
+    /** Copies the bundled TV helper and pushes it through 多屏互动. */
+    private void installHelper(final Device d) {
+        try {
+            java.io.File f = new java.io.File(getCacheDir(), "intercom-tv.apk");
+            try (java.io.InputStream in = getAssets().open("intercom-tv.apk");
+                 java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+                byte[] b = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(b)) > 0) out.write(b, 0, n);
+            }
+            pushApk(d, f);
+        } catch (Exception e) {
+            toast("读取对讲端失败：" + e.getMessage());
+        }
     }
 
     private void openPanel(Device d) {
@@ -715,7 +826,14 @@ public class MainActivity extends Activity {
             while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
             out.close();
             in.close();
+            pushApk(d, f);
+        } catch (Exception e) {
+            toast("读取 APK 失败：" + e.getMessage());
+        }
+    }
 
+    private void pushApk(final Device d, File f) {
+        try {
             PackageManager pm = getPackageManager();
             android.content.pm.PackageInfo info = pm.getPackageArchiveInfo(f.getAbsolutePath(), 0);
             if (info == null) {
