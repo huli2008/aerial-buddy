@@ -4,6 +4,11 @@
 
 # Aerial 管家 · Aerial Buddy
 
+[![Release](https://img.shields.io/github/v/release/huli2008/aerial-buddy?label=release&color=6C5CE7)](https://github.com/huli2008/aerial-buddy/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/huli2008/aerial-buddy/total?color=38D39F)](https://github.com/huli2008/aerial-buddy/releases)
+[![License](https://img.shields.io/github/license/huli2008/aerial-buddy?color=blue)](LICENSE)
+[![Android](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)]()
+
 **手机管电视：扫一下二维码就绑上，壁纸、屏保、装 App 全在手机上。**
 
 [Aerial 电视桌面](https://github.com/pengchujin/aerial-tv) 的配套管理 App —— **支持所有 Android TV**：
