@@ -32,6 +32,7 @@ public final class Store {
                 d.url = o.optString("url");
                 d.host = o.optString("host");
                 d.pending = o.optBoolean("pending", false);
+                d.autoChecked = o.optBoolean("autoChecked", false);
                 out.add(d);
             }
         } catch (Exception ignored) {
@@ -49,6 +50,7 @@ public final class Store {
                 o.put("url", d.url);
                 o.put("host", d.host == null ? "" : d.host);
                 o.put("pending", d.pending);
+                o.put("autoChecked", d.autoChecked);
             } catch (Exception ignored) {
             }
             arr.put(o);

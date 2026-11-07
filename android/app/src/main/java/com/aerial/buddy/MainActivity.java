@@ -238,11 +238,21 @@ public class MainActivity extends Activity {
         LinearLayout acts = new LinearLayout(this);
         acts.setOrientation(LinearLayout.HORIZONTAL);
         acts.setPadding(0, dp(9), 0, 0);
-        acts.addView(chip("壁纸", () -> showWallpapers(d)));
-        acts.addView(chip("应用", () -> openApps(d)));
-        acts.addView(chip("对讲", () -> showIntercom(d)));
-        acts.addView(chip("管理", () -> openPanel(d)));
-        acts.addView(chip("刷新", () -> refresh(d)));
+        if (d.bound()) {
+            acts.addView(chip("壁纸", () -> showWallpapers(d)));
+            acts.addView(chip("应用", () -> openApps(d)));
+            acts.addView(chip("对讲", () -> showIntercom(d)));
+            acts.addView(chip("装 Aerial", () -> installAerial(d)));
+            acts.addView(chip("刷新", () -> refresh(d)));
+        } else {
+            acts.addView(chip("装 Aerial", () -> installAerial(d)));
+            acts.addView(chip("装对讲端", () -> installHelper(d)));
+            acts.addView(chip("扫码绑定", () -> {
+                pendingScanIp = d.ip();
+                captureQr();
+            }));
+            acts.addView(chip("刷新", () -> refresh(d)));
+        }
         card.addView(acts);
 
         card.setOnClickListener(v -> {
@@ -666,6 +676,72 @@ public class MainActivity extends Activity {
                 .putExtra("theme", theme.id));
     }
 
+    /** Copies the bundled Aerial guard build and pushes it through 多屏互动. */
+    private void installAerial(final Device d) {
+        pushAsset(d, "aerial-guard.apk", true);
+    }
+
+    private void pushAsset(final Device d, final String asset, final boolean thenIntercom) {
+        try {
+            File out = new File(getCacheDir(), asset);
+            InputStream in = getAssets().open(asset);
+            FileOutputStream fos = new FileOutputStream(out);
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+            fos.close();
+            in.close();
+            Installer.push(this, d, out, (ok, msg) -> {
+                toast(msg);
+                if (ok && thenIntercom) installHelper(d);
+                if (ok) refresh(d);
+            });
+        } catch (Exception e) {
+            toast("读取 " + asset + " 失败：" + e.getMessage());
+        }
+    }
+
+    /** True when the TV already answers Aerial's config port. */
+    private static boolean hasAerial(String ip) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress(ip, 8790), 900);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * First connection only: probe for the Aerial config port, and if the TV does not answer, ask
+     * before pushing the bundled guard build. Later connections stay quiet — 「装 Aerial」 is manual.
+     */
+    private void autoInstallAerial(final Device d) {
+        if (d.autoChecked) return;
+        d.autoChecked = true;
+        Store.save(this, devices);
+        new Thread(() -> {
+            boolean present = hasAerial(d.ip());
+            runOnUiThread(() -> {
+                if (present) {
+                    d.status = "已装 Aerial（未绑定，扫码后可管壁纸/应用）";
+                    d.dot = 2;
+                    render();
+                    return;
+                }
+                d.status = "未检测到 Aerial";
+                render();
+                new AlertDialog.Builder(this)
+                        .setTitle("这台电视还没装 Aerial")
+                        .setMessage("检测 " + d.ip() + ":8790 没有响应，说明电视上还没有 Aerial 桌面。\n\n"
+                                + "现在通过电视的「多屏互动」推送安装？（安装包已内置，约 3 MB，"
+                                + "电视上按遥控器「右键 → 同意」即可）")
+                        .setNegativeButton("稍后", null)
+                        .setPositiveButton("立即安装", (dlg, w) -> installAerial(d))
+                        .show();
+            });
+        }, "first-check").start();
+    }
+
     private void openPanel(Device d) {
         startActivity(new Intent(this, WebActivity.class)
                 .putExtra("url", d.base())
@@ -731,7 +807,10 @@ public class MainActivity extends Activity {
                 if (added == 0) {
                     toast("发现 " + total + " 台，都已在列表里");
                 } else {
-                    toast("已添加 " + added + " 台：可直接「安装 APK」，绑定后再管壁纸/应用");
+                    toast("已添加 " + added + " 台，正在检查是否已装 Aerial…");
+                }
+                for (Device d : devices) {
+                    if (!d.bound()) autoInstallAerial(d);
                 }
             }
 
@@ -819,10 +898,12 @@ public class MainActivity extends Activity {
             if (known.bound()) openPanel(known);
             return;
         }
-        devices.add(newDevice(h));
+        Device added = newDevice(h);
+        devices.add(added);
         Store.save(this, devices);
         render();
-        toast("已添加 " + h + "：可直接「安装 APK」，绑定后再管壁纸/应用");
+        toast("已添加 " + h + "，正在检查是否已装 Aerial…");
+        autoInstallAerial(added);
     }
 
     private void bind(String url) {

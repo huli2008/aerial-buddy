@@ -10,7 +10,7 @@
 针对 **雷鸟（FFALCON）/ TCL** 电视做过实测：这类固件禁掉了 `adb install`，本 App 用电视自带的
 「多屏互动」通道把 APK 推过去安装。
 
-Android 5.0+ · 单 APK 474 KB（含 98 KB 电视端对讲器）· MIT
+Android 5.0+ · 单 APK 3.2 MB（**内置 Aerial guard 包** + 电视端对讲器）· MIT
 
 </div>
 
@@ -37,10 +37,13 @@ Android 5.0+ · 单 APK 474 KB（含 98 KB 电视端对讲器）· MIT
 
 ## 先装 Aerial（guard 版）
 
-本 App 只负责「管理」和「推送安装」，**不包含 Aerial 本体**。电视上要先有 Aerial：
+APK 里**已经内置了** `Aerial-1.86-guard-TCL-MT5879.apk`（3.01 MB，sha256 `bb1e8bc6…5e36`），不需要另外下载。
 
-👉 **[huli2008/aerial-guard-tcl](https://github.com/huli2008/aerial-guard-tcl)** —— 雷鸟 / TCL 专用 guard 包。
-Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，SHA-256 `bb1e8bc6…5e36`）。
+- **首次连接**一台电视时，App 会先探测 `8790` 端口判断装没装 Aerial；没装就弹窗问你要不要现在装，装了就不再问；
+- 之后任何时候都可以点卡片上的 **「装 Aerial」** 手动再推一次（升级也走这个按钮）。
+
+Aerial 本体由 [pengchujin/aerial-tv](https://github.com/pengchujin/aerial-tv) 开发，也可以从
+[guard 仓库](https://github.com/huli2008/aerial-guard-tcl) 单独下载。
 
 装法（用本 App 完成，**不需要先扫码**）：
 
@@ -66,9 +69,9 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.8.0.apk](releases/aerial-buddy-v0.8.0.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.9.1.apk](releases/aerial-buddy-v0.9.1.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.8.0.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.9.1.apk>
 
 ## 使用
 

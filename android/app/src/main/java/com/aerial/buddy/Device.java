@@ -15,6 +15,7 @@ public class Device {
     public String status;   // last status text
     public int dot;         // 0 offline, 1 online, 2 unknown
     public boolean pending; // not bound yet: needs the QR token before wallpapers/apps work
+    public boolean autoChecked; // first-connection "is Aerial installed?" probe already done
 
     public boolean bound() {
         return url != null && !url.trim().isEmpty();
