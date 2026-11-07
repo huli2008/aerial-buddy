@@ -54,9 +54,9 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.7.3.apk](releases/aerial-buddy-v0.7.3.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.7.4.apk](releases/aerial-buddy-v0.7.4.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.7.3.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.7.4.apk>
 
 ## 使用
 

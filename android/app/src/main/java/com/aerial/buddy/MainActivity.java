@@ -869,25 +869,45 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void decodeUri(Uri uri) {
-        try {
-            InputStream in = getContentResolver().openInputStream(uri);
-            Bitmap bmp = BitmapFactory.decodeStream(in);
-            if (in != null) in.close();
-            String text = Qr.decode(bmp);
-            if (text == null) {
-                toast("没识别到二维码，靠近一点、对准再拍一次");
-                return;
+    private void decodeUri(final Uri uri) {
+        toast("正在识别二维码…");
+        new Thread(() -> {
+            String text = null;
+            String error = null;
+            try {
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                InputStream b1 = getContentResolver().openInputStream(uri);
+                BitmapFactory.decodeStream(b1, null, bounds);
+                if (b1 != null) b1.close();
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                int big = Math.max(bounds.outWidth, bounds.outHeight);
+                int sample = 1;
+                while (big / sample > 2400) sample *= 2;
+                opts.inSampleSize = sample;
+                opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                InputStream in = getContentResolver().openInputStream(uri);
+                Bitmap bmp = BitmapFactory.decodeStream(in, null, opts);
+                if (in != null) in.close();
+                text = Qr.decode(bmp);
+            } catch (Throwable e) {
+                error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             }
-            String url = Qr.toBaseUrl(text);
-            if (url == null || !url.contains(":8790")) {
-                toast("二维码内容不是电视地址：" + text);
-                return;
-            }
-            bind(url);
-        } catch (Exception e) {
-            toast("读取图片失败：" + e.getMessage());
-        }
+            final String t = text;
+            final String err = error;
+            runOnUiThread(() -> {
+                if (t == null) {
+                    toast(err == null ? "没识别到二维码：把二维码拍满一点、避开反光再试" : ("读取图片失败：" + err));
+                    return;
+                }
+                String url = Qr.toBaseUrl(t);
+                if (url == null || !url.contains(":8790")) {
+                    toast("二维码内容不是电视地址：" + t);
+                    return;
+                }
+                bind(url);
+            });
+        }, "qr-decode").start();
     }
 
     // ---------- install ----------
