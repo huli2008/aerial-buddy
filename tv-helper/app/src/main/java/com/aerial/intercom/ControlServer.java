@@ -77,7 +77,30 @@ public final class ControlServer {
                             }
                         }
                         String body;
-                        if (path.startsWith("/image")) {
+                        if (path.startsWith("/gif") || path.startsWith("/video")) {
+                            byte[] data = new byte[Math.max(0, Math.min(contentLength, 32 * 1024 * 1024))];
+                            int read = 0;
+                            while (read < data.length) {
+                                int n = rawIn.read(data, read, data.length - read);
+                                if (n <= 0) break;
+                                read += n;
+                            }
+                            if (path.startsWith("/gif")) {
+                                Overlay.gif(appContext, data);
+                                body = "{\"ok\":true}";
+                            } else {
+                                String ext = param(path, "ext");
+                                if (ext.isEmpty()) ext = "mp4";
+                                ext = ext.replaceAll("[^a-zA-Z0-9]", "");
+                                if (ext.isEmpty()) ext = "mp4";
+                                java.io.File f = new java.io.File(appContext.getCacheDir(), "danmaku-video." + ext);
+                                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(f)) {
+                                    fos.write(data, 0, read);
+                                }
+                                Overlay.video(appContext, f);
+                                body = "{\"ok\":true}";
+                            }
+                        } else if (path.startsWith("/image")) {
                             byte[] data = new byte[Math.max(0, Math.min(contentLength, 8 * 1024 * 1024))];
                             int read = 0;
                             while (read < data.length) {

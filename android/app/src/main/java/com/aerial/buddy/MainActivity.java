@@ -1728,8 +1728,68 @@ public class MainActivity extends Activity {
     }
 
     /** Copies the bundled Aerial guard build and pushes it through 多屏互动. */
+    /** 装 Aerial：先让用户选通道（自动 / ADB / 多屏互动），再按选择推送。 */
     private void installAerial(final Device d) {
-        pushAsset(d, "aerial-guard.apk", true);
+        final String[] items = {
+                "自动（ADB 优先，失败回退多屏互动）",
+                "仅 ADB（需电视开启网络调试）",
+                "仅多屏互动（T-Cast，需电视端确认）"
+        };
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        final android.app.Dialog[] ref = new android.app.Dialog[1];
+        for (int i = 0; i < items.length; i++) {
+            final int mode = i;
+            LinearLayout row = UiKit.listRow(this, theme, i == 0 ? "⚡" : (i == 1 ? "🔌" : "📡"),
+                    items[i], null, false, () -> {
+                        if (ref[0] != null) ref[0].dismiss();
+                        pushAerialWithMode(d, mode);
+                    });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(8);
+            box.addView(row, lp);
+        }
+        ref[0] = new GlassDialog.Builder(this, theme)
+                .title("安装 Aerial · 选择通道")
+                .content(box)
+                .negative("取消", null)
+                .show();
+    }
+
+    private void pushAerialWithMode(final Device d, final int mode) {
+        new Thread(() -> {
+            java.io.File out = new java.io.File(getCacheDir(), "aerial-guard.apk");
+            try {
+                long assetLen = -1;
+                try {
+                    assetLen = getAssets().openFd("aerial-guard.apk").getLength();
+                } catch (Exception ignored) {
+                }
+                if (out.exists() && Math.abs(out.length() - assetLen) <= 2) {
+                    runOnUiThread(() -> Installer.pushChannel(this, d, out, mode, (ok, msg) -> {
+                        toast(msg);
+                        if (ok) installHelper(d);
+                        if (ok) refresh(d);
+                    }));
+                    return;
+                }
+                InputStream in = getAssets().open("aerial-guard.apk");
+                FileOutputStream fos = new FileOutputStream(out);
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+                fos.close();
+                in.close();
+                runOnUiThread(() -> Installer.pushChannel(this, d, out, mode, (ok, msg) -> {
+                    toast(msg);
+                    if (ok) installHelper(d);
+                    if (ok) refresh(d);
+                }));
+            } catch (Exception e) {
+                runOnUiThread(() -> toast("读取安装包失败：" + e.getMessage()));
+            }
+        }, "aerial-copy").start();
     }
 
     private void pushAsset(final Device d, final String asset, final boolean thenIntercom) {

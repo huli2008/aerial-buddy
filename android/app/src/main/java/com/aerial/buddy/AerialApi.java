@@ -17,8 +17,29 @@ public final class AerialApi {
     private AerialApi() {
     }
 
+    /** state 结果缓存：同一台电视 8 秒内复用，避免反复请求拖慢刷新。 */
+    private static String cachedBase;
+    private static long cachedAt;
+    private static JSONObject cachedState;
+
+
     public static JSONObject state(Device d) throws Exception {
-        return call(d, "api/state", null, null);
+        long now = System.currentTimeMillis();
+        if (cachedState != null && cachedBase != null && cachedBase.equals(d.base())
+                && now - cachedAt < 8000) {
+            return cachedState;
+        }
+        JSONObject s = call(d, "api/state", null, null);
+        cachedState = s;
+        cachedBase = d.base();
+        cachedAt = now;
+        return s;
+    }
+
+    /** 主动失效缓存（改壁纸/装应用后调用）。 */
+    public static void invalidate() {
+        cachedState = null;
+        cachedBase = null;
     }
 
     public static JSONObject post(Device d, String path, Map<String, String> form) throws Exception {
@@ -33,8 +54,8 @@ public final class AerialApi {
             throws Exception {
         URL u = new URL(d.base() + path);
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
-        c.setConnectTimeout(4000);
-        c.setReadTimeout(10000);
+        c.setConnectTimeout(1500);
+        c.setReadTimeout(3500);
         c.setRequestProperty("Accept", "application/json");
         if (pin != null) c.setRequestProperty("X-Aerial-Pin", pin);
         if (form != null) {

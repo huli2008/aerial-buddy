@@ -27,6 +27,45 @@ public final class Installer {
         }
     }
 
+    /**
+     * 按通道安装：0=自动（ADB 优先，失败回退多屏互动），1=仅 ADB，2=仅多屏互动。
+     */
+    public static void pushChannel(final Activity act, final Device d, final File apk,
+                                   final int mode, final Done done) {
+        if (mode == 1) {
+            pushAdb(act, d, apk, done);
+            return;
+        }
+        if (mode == 2) {
+            pushTcast(act, d, apk, done);
+            return;
+        }
+        // 自动：先探测 ADB 端口，通了先用 ADB；ADB 失败再回退多屏互动
+        new Thread(() -> {
+            boolean adbOpen;
+            try (java.net.Socket s = new java.net.Socket()) {
+                s.connect(new java.net.InetSocketAddress(d.ip(), 5555), 900);
+                adbOpen = true;
+            } catch (Exception e) {
+                adbOpen = false;
+            }
+            final boolean useAdb = adbOpen;
+            act.runOnUiThread(() -> {
+                if (useAdb) {
+                    pushAdb(act, d, apk, (ok, msg) -> {
+                        if (ok) {
+                            done.finished(true, msg);
+                        } else {
+                            pushTcast(act, d, apk, done);
+                        }
+                    });
+                } else {
+                    pushTcast(act, d, apk, done);
+                }
+            });
+        }, "probe-adb").start();
+    }
+
     private static boolean tcastOpen(String ip) {
         try (java.net.Socket s = new java.net.Socket()) {
             s.connect(new java.net.InetSocketAddress(ip, 6553), 500);

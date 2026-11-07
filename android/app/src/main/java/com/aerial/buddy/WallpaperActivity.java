@@ -41,6 +41,9 @@ public class WallpaperActivity extends Activity {
     private GridLayout grid;
     private TextView status;
     private String selected;
+    private static String cachedBase;
+    private static long cachedAt;
+    private static org.json.JSONObject cachedState;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -103,7 +106,17 @@ public class WallpaperActivity extends Activity {
         status.setText("读取壁纸列表…");
         new Thread(() -> {
             try {
-                JSONObject s = AerialApi.state(device);
+                JSONObject s = null;
+                if (cachedState != null && cachedBase != null
+                        && cachedBase.equals(device.base())
+                        && System.currentTimeMillis() - cachedAt < 60000) {
+                    s = cachedState;
+                } else {
+                    s = AerialApi.state(device);
+                    cachedState = s;
+                    cachedBase = device.base();
+                    cachedAt = System.currentTimeMillis();
+                }
                 JSONArray arr = s.optJSONArray("wallpapers");
                 final String sel = s.optString("selected", "");
                 main.post(() -> {

@@ -15,6 +15,7 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import java.io.File;
 import java.util.Random;
 
 /**
@@ -104,6 +105,157 @@ public final class Overlay {
     }
 
     /** 图片：居中淡入，3 秒后消失。 */
+    /** 动图（GIF/WebP）：API 28+ 用 AnimatedImageDrawable，低版本退化为静帧。 */
+    public static void gif(final Context ctx, final byte[] bytes) {
+        if (bytes == null || bytes.length == 0) return;
+        UI.post(() -> {
+            try {
+                final android.widget.ImageView iv = new android.widget.ImageView(ctx);
+                GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius(18);
+                bg.setColor(0x33000000);
+                iv.setBackground(bg);
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    android.graphics.ImageDecoder.Source src =
+                            android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes));
+                    android.graphics.drawable.Drawable d =
+                            android.graphics.ImageDecoder.decodeDrawable(src);
+                    iv.setImageDrawable(d);
+                    if (d instanceof android.graphics.drawable.AnimatedImageDrawable) {
+                        ((android.graphics.drawable.AnimatedImageDrawable) d).start();
+                    }
+                } else {
+                    Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (bmp == null) return;
+                    iv.setImageBitmap(bmp);
+                }
+
+                final WindowManager w = wm(ctx);
+                int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+                int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+                int width = (int) (screenW * 0.6f);
+                int height = (int) (screenH * 0.45f);
+                WindowManager.LayoutParams p = params(width, height);
+                p.x = (screenW - width) / 2;
+                p.y = (screenH - height) / 2;
+                w.addView(iv, p);
+
+                UI.postDelayed(() -> {
+                    try {
+                        w.removeView(iv);
+                    } catch (Exception ignored) {
+                    }
+                }, 12000);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    /** 视频弹幕：保存到缓存后，用 VideoView 覆盖层播放（带声音，最多 30 秒）。 */
+    public static void video(final Context ctx, final File file) {
+        if (file == null || !file.exists()) return;
+        UI.post(() -> {
+            try {
+                final android.widget.VideoView vv = new android.widget.VideoView(ctx);
+                android.widget.MediaController mc = new android.widget.MediaController(ctx);
+                vv.setMediaController(mc);
+                vv.setVideoPath(file.getAbsolutePath());
+
+                final WindowManager w = wm(ctx);
+                int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+                int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+                int width = (int) (screenW * 0.7f);
+                int height = (int) (screenH * 0.5f);
+                WindowManager.LayoutParams p = params(width, height);
+                p.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+                p.x = (screenW - width) / 2;
+                p.y = (screenH - height) / 2;
+                w.addView(vv, p);
+
+                vv.setOnPreparedListener(mp -> {
+                    mp.setLooping(false);
+                    vv.start();
+                });
+                vv.setOnCompletionListener(mp -> {
+                    try {
+                        w.removeView(vv);
+                    } catch (Exception ignored) {
+                    }
+                });
+                vv.setOnErrorListener((mp, what, extra) -> {
+                    try {
+                        w.removeView(vv);
+                    } catch (Exception ignored) {
+                    }
+                    // 编码不支持时退化为「抽帧播放」：每秒一帧，最多 10 秒
+                    playFramesFallback(ctx, file);
+                    return true;
+                });
+                UI.postDelayed(() -> {
+                    try {
+                        w.removeView(vv);
+                    } catch (Exception ignored) {
+                    }
+                }, 30000);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    /** 视频解码失败时：抽帧做成逐帧动画，至少能看到内容。 */
+    private static void playFramesFallback(final Context ctx, final File file) {
+        try {
+            android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+            r.setDataSource(file.getAbsolutePath());
+            String durStr = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+            long dur = durStr == null ? 10000 : Long.parseLong(durStr);
+            final java.util.List<Bitmap> frames = new java.util.ArrayList<>();
+            long step = Math.max(500, dur / 10);
+            for (long ms = 0; ms < Math.min(dur, 10000); ms += step) {
+                Bitmap f = r.getFrameAtTime(ms * 1000L,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
+                if (f != null) frames.add(f);
+            }
+            r.release();
+            if (frames.isEmpty()) return;
+            UI.post(() -> {
+                final android.widget.ImageView iv = new android.widget.ImageView(ctx);
+                GradientDrawable bg = new GradientDrawable();
+                bg.setCornerRadius(18);
+                bg.setColor(0x33000000);
+                iv.setBackground(bg);
+                final WindowManager w = wm(ctx);
+                int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+                int screenH = ctx.getResources().getDisplayMetrics().heightPixels;
+                int width = (int) (screenW * 0.7f);
+                int height = (int) (screenH * 0.5f);
+                WindowManager.LayoutParams p = params(width, height);
+                p.x = (screenW - width) / 2;
+                p.y = (screenH - height) / 2;
+                w.addView(iv, p);
+                final int[] idx = {0};
+                final Runnable tick = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (idx[0] >= frames.size()) {
+                            try {
+                                w.removeView(iv);
+                            } catch (Exception ignored) {
+                            }
+                            return;
+                        }
+                        iv.setImageBitmap(frames.get(idx[0]++));
+                        UI.postDelayed(this, 600);
+                    }
+                };
+                UI.post(tick);
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
     public static void image(final Context ctx, final Bitmap bmp) {
         if (bmp == null) return;
         UI.post(() -> {

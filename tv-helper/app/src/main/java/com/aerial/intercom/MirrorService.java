@@ -94,7 +94,7 @@ public class MirrorService extends Service {
             WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
             DisplayMetrics dm = new DisplayMetrics();
             wm.getDefaultDisplay().getRealMetrics(dm);
-            int scale = Math.max(2, Math.round(Math.max(dm.widthPixels, dm.heightPixels) / 960f));
+            int scale = Math.max(2, Math.round(Math.max(dm.widthPixels, dm.heightPixels) / 720f));
             width = dm.widthPixels / scale;
             height = dm.heightPixels / scale;
             int dpi = dm.densityDpi;
@@ -146,7 +146,7 @@ public class MirrorService extends Service {
             if (image == null) return;
             // 无观看者时不编码；有观看者时限制到 ~8 fps，避免 60fps 全量 JPEG 编码把 CPU 打满。
             long now = System.currentTimeMillis();
-            if (clients.isEmpty() || now - lastFrameAt < 120) return;
+            if (clients.isEmpty() || now - lastFrameAt < 80) return;
             lastFrameAt = now;
             Image.Plane plane = image.getPlanes()[0];
             ByteBuffer buf = plane.getBuffer();
@@ -157,7 +157,7 @@ public class MirrorService extends Service {
             bmp.copyPixelsFromBuffer(buf);
             Bitmap cropped = Bitmap.createBitmap(bmp, 0, 0, width, height);
             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-            cropped.compress(Bitmap.CompressFormat.JPEG, 55, out);
+            cropped.compress(Bitmap.CompressFormat.JPEG, 62, out);
             byte[] jpeg = out.toByteArray();
             bmp.recycle();
             cropped.recycle();

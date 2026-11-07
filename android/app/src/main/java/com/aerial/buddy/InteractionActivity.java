@@ -367,7 +367,7 @@ public class InteractionActivity extends Activity {
         TextView send = action("发送弹幕", theme.accent, theme.accentText);
         send.setOnClickListener(v -> sendDanmaku(input.getText().toString()));
         row.addView(send, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        TextView img = action("发图片", theme.card, theme.text);
+        TextView img = action("图片 / 视频", theme.card, theme.text);
         LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(0, dp(48), 1f);
         ilp.leftMargin = dp(10);
         img.setOnClickListener(v -> pickImage());
@@ -609,9 +609,11 @@ public class InteractionActivity extends Activity {
     }
 
     private void pickImage() {
+        // 支持：静态图 / GIF 动图 / 短视频（视频会带上声音播放）
         android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_GET_CONTENT);
-        i.setType("image/*");
-        startActivityForResult(android.content.Intent.createChooser(i, "选择要投到电视的图片"), 51);
+        i.setType("*/*");
+        i.putExtra(android.content.Intent.EXTRA_MIME_TYPES, new String[]{"image/*", "video/*"});
+        startActivityForResult(android.content.Intent.createChooser(i, "选择图片 / 动图 / 视频"), 51);
     }
 
     @Override
@@ -619,8 +621,48 @@ public class InteractionActivity extends Activity {
         super.onActivityResult(req, res, data);
         if (req != 51 || res != RESULT_OK || data == null || data.getData() == null) return;
         final android.net.Uri uri = data.getData();
-        status.setText("正在发送图片…");
+        String mime = getContentResolver().getType(uri);
+        final boolean isVideo = mime != null && mime.startsWith("video");
+        final boolean isGif = mime != null && (mime.contains("gif") || mime.contains("webp"));
+        status.setText(isVideo ? "正在发送视频…" : (isGif ? "正在发动图…" : "正在发送图片…"));
         new Thread(() -> {
+            if (isVideo || isGif) {
+                try {
+                    InputStream vin = getContentResolver().openInputStream(uri);
+                    java.io.ByteArrayOutputStream vbos = new java.io.ByteArrayOutputStream();
+                    byte[] vbuf = new byte[64 * 1024];
+                    int vn;
+                    while ((vn = vin.read(vbuf)) > 0) vbos.write(vbuf, 0, vn);
+                    vin.close();
+                    byte[] bytes = vbos.toByteArray();
+                    String ext = "mp4";
+                    if (isVideo && mime != null && mime.contains("/")) {
+                        ext = mime.substring(mime.indexOf(47) + 1);
+                        ext = ext.replaceAll("[^a-zA-Z0-9]", "");
+                        if (ext.isEmpty()) ext = "mp4";
+                    }
+                    HttpURLConnection c = (HttpURLConnection) new URL("http://" + ip + ":8769/"
+                            + (isVideo ? ("video?ext=" + ext) : "gif")).openConnection();
+                    c.setConnectTimeout(3000);
+                    c.setReadTimeout(15000);
+                    c.setRequestMethod("POST");
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", isVideo ? "video/mp4" : "image/gif");
+                    c.setFixedLengthStreamingMode(bytes.length);
+                    java.io.OutputStream out = c.getOutputStream();
+                    out.write(bytes);
+                    out.flush();
+                    out.close();
+                    int code = c.getResponseCode();
+                    c.disconnect();
+                    ui(code == 200
+                            ? (isVideo ? "视频已投到电视（带声音，最长 30 秒）" : "动图已投到电视（最长 12 秒）")
+                            : ("电视端返回 " + code + "，需助手 0.8.0+"));
+                } catch (Exception e) {
+                    ui("发送失败：" + e.getMessage());
+                }
+                return;
+            }
             try {
                 InputStream in = getContentResolver().openInputStream(uri);
                 android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(in);
