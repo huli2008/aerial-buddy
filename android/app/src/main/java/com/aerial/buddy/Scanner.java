@@ -35,12 +35,13 @@ public final class Scanner {
     public interface Cb {
         void onProgress(int scanned, int total);
 
-        void onFinished(List<String> ips);
+        void onFinished(List<String> aerialIps, List<String> tcastIps);
 
         void onError(String message);
     }
 
     private static final int PORT = 8790;
+    private static final int TCAST_PORT = 6553;
     private static final int CONNECT_TIMEOUT_MS = 320;
     private static final int READ_TIMEOUT_MS = 700;
     private static final int THREADS = 64;
@@ -60,15 +61,20 @@ public final class Scanner {
                 final String prefix = self.substring(0, self.lastIndexOf('.') + 1);
                 final int total = 254;
                 final AtomicInteger done = new AtomicInteger();
-                final List<String> found = Collections.synchronizedList(new ArrayList<String>());
+                final List<String> aerial = Collections.synchronizedList(new ArrayList<String>());
+                final List<String> tcast = Collections.synchronizedList(new ArrayList<String>());
                 final CountDownLatch latch = new CountDownLatch(total);
                 ExecutorService pool = Executors.newFixedThreadPool(THREADS);
                 for (int i = 1; i <= total; i++) {
                     final String ip = prefix + i;
                     pool.execute(() -> {
                         try {
-                            if (!ip.equals(self) && probe(ip)) {
-                                found.add(ip);
+                            int kind = ip.equals(self) ? 0 : probe(ip);
+                            if (kind == 2) {
+                                aerial.add(ip);
+                                main.post(() -> cb.onProgress(done.get(), total));
+                            } else if (kind == 1) {
+                                tcast.add(ip);
                                 main.post(() -> cb.onProgress(done.get(), total));
                             }
                         } finally {
@@ -80,16 +86,42 @@ public final class Scanner {
                 }
                 latch.await(30, TimeUnit.SECONDS);
                 pool.shutdownNow();
-                Collections.sort(found);
-                final List<String> result = new ArrayList<>(found);
-                main.post(() -> cb.onFinished(result));
+                Collections.sort(aerial);
+                Collections.sort(tcast);
+                final List<String> a = new ArrayList<>(aerial);
+                final List<String> t = new ArrayList<>(tcast);
+                main.post(() -> cb.onFinished(a, t));
             } catch (Exception e) {
                 main.post(() -> cb.onError(e.getMessage() == null ? "扫描失败" : e.getMessage()));
             }
         }, "aerial-scan").start();
     }
 
-    private static boolean probe(String ip) {
+    /** 2 = Aerial (8790 fingerprint), 1 = only 多屏互动/6553 (can still receive APKs), 0 = nothing. */
+    private static int probe(String ip) {
+        if (probeTcast(ip)) {
+            if (probeAerial(ip)) return 2;
+            return 1;
+        }
+        return 0;
+    }
+
+    private static boolean probeTcast(String ip) {
+        Socket s = new Socket();
+        try {
+            s.connect(new InetSocketAddress(ip, TCAST_PORT), CONNECT_TIMEOUT_MS);
+            return true;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            try {
+                s.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static boolean probeAerial(String ip) {
         Socket s = new Socket();
         try {
             s.connect(new InetSocketAddress(ip, PORT), CONNECT_TIMEOUT_MS);

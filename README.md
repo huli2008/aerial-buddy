@@ -42,12 +42,15 @@ Android 5.0+ · 单 APK 474 KB（含 98 KB 电视端对讲器）· MIT
 👉 **[huli2008/aerial-guard-tcl](https://github.com/huli2008/aerial-guard-tcl)** —— 雷鸟 / TCL 专用 guard 包。
 Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，SHA-256 `bb1e8bc6…5e36`）。
 
-装法（用本 App 完成）：
+装法（用本 App 完成，**不需要先扫码**）：
 
 1. 手机与电视连同一 Wi-Fi；
-2. 本 App「扫描」→ 点出现的电视 → 拍电视「个性化」页的二维码完成绑定；
-3. 点该电视卡片的「安装 APK」→ 选刚下载的 guard 包 → 电视上按「右键 → 同意」；
+2. 本 App「扫描」，或「手动输入」只填电视 IP → 列表里出现这台电视，卡片显示「未绑定 · 可直接「安装 APK」」；
+3. 点这张卡片的「安装 APK」→ 选刚下载的 guard 包 → 电视上按「右键 → 同意」；
 4. 电视上打开 Aerial，按提示设为默认桌面。
+
+> 推送安装走的是电视自带的「多屏互动」（6553），只需要 IP，跟电视上有没有 Aerial、有没有扫码都无关。
+> 二维码只在**之后想用手机管壁纸/应用/对讲**时才扫（「扫码绑定」），不扫也能装、也能用安装功能。
 
 > 安装前建议核对哈希：Windows 用 `certutil -hashfile <apk> SHA256`，macOS/Linux 用 `shasum -a 256`。
 
@@ -63,9 +66,9 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.7.4.apk](releases/aerial-buddy-v0.7.4.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.8.0.apk](releases/aerial-buddy-v0.8.0.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.7.4.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.8.0.apk>
 
 ## 使用
 

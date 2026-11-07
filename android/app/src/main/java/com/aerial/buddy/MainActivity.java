@@ -246,11 +246,10 @@ public class MainActivity extends Activity {
         card.addView(acts);
 
         card.setOnClickListener(v -> {
-            if (d.pending) {
-                pendingScanIp = d.ip();
-                captureQr();
-            } else {
+            if (d.bound()) {
                 openPanel(d);
+            } else {
+                startInstall(d);
             }
         });
         card.setOnLongClickListener(v -> {
@@ -301,8 +300,8 @@ public class MainActivity extends Activity {
     }
 
     private void refresh(final Device d) {
-        if (d.pending) {
-            d.status = "待授权：点一下扫电视二维码";
+        if (!d.bound()) {
+            d.status = "未绑定 · 可直接「安装 APK」，扫码后才管壁纸/应用/对讲";
             d.dot = 2;
             render();
             return;
@@ -708,28 +707,32 @@ public class MainActivity extends Activity {
             }
 
             @Override
-            public void onFinished(java.util.List<String> ips) {
+            public void onFinished(java.util.List<String> aerialIps, java.util.List<String> tcastIps) {
                 if (!dlg.isShowing()) return;
                 dlg.dismiss();
-                if (ips.isEmpty()) {
-                    toast("没发现 Aerial 电视：确认电视开机、与本机同一 Wi-Fi");
+                int total = aerialIps.size() + tcastIps.size();
+                if (total == 0) {
+                    toast("没发现电视：确认电视开机、与本机同一 Wi-Fi");
                     return;
                 }
                 int added = 0;
-                for (String ip : ips) {
+                for (String ip : aerialIps) {
                     if (findByIp(ip) != null) continue;
-                    Device d = new Device();
-                    d.id = String.valueOf(System.currentTimeMillis() + added);
-                    d.name = "电视 " + ip.substring(ip.lastIndexOf('.') + 1);
-                    d.url = "http://" + ip + ":8790/";
-                    d.pending = true;
-                    devices.add(d);
+                    devices.add(newDevice(ip));
+                    added++;
+                }
+                for (String ip : tcastIps) {
+                    if (findByIp(ip) != null) continue;
+                    devices.add(newDevice(ip));
                     added++;
                 }
                 Store.save(MainActivity.this, devices);
                 render();
-                toast(added == 0 ? ("发现 " + ips.size() + " 台，都已在列表里")
-                        : ("已添加 " + added + " 台，点一下扫二维码完成授权"));
+                if (added == 0) {
+                    toast("发现 " + total + " 台，都已在列表里");
+                } else {
+                    toast("已添加 " + added + " 台：可直接「安装 APK」，绑定后再管壁纸/应用");
+                }
             }
 
             @Override
@@ -748,6 +751,17 @@ public class MainActivity extends Activity {
     private Device findByIp(String ip) {
         for (Device d : devices) if (ip.equals(d.ip())) return d;
         return null;
+    }
+
+    /** A TV known only by IP: install works right away, binding comes later (or never). */
+    private Device newDevice(String ip) {
+        Device d = new Device();
+        d.id = String.valueOf(System.currentTimeMillis() + Math.random() * 1000);
+        d.name = "电视 " + ip.substring(ip.lastIndexOf('.') + 1);
+        d.host = ip;
+        d.url = "";
+        d.pending = true;
+        return d;
     }
 
     private void pickQr() {
@@ -801,25 +815,14 @@ public class MainActivity extends Activity {
         }
         Device known = findByIp(h);
         if (known != null) {
-            if (known.pending) {
-                pendingScanIp = h;
-                captureQr();
-            } else {
-                toast("这台电视已经在列表里");
-                openPanel(known);
-            }
+            toast("这台电视已经在列表里");
+            if (known.bound()) openPanel(known);
             return;
         }
-        Device d = new Device();
-        d.id = String.valueOf(System.currentTimeMillis());
-        d.name = "电视 " + h.substring(h.lastIndexOf('.') + 1);
-        d.url = "http://" + h + ":8790/";
-        d.pending = true;
-        devices.add(d);
+        devices.add(newDevice(h));
         Store.save(this, devices);
         render();
-        pendingScanIp = h;
-        captureQr();
+        toast("已添加 " + h + "：可直接「安装 APK」，绑定后再管壁纸/应用");
     }
 
     private void bind(String url) {
@@ -833,7 +836,7 @@ public class MainActivity extends Activity {
         String ip = hostPart.contains(":") ? hostPart.substring(0, hostPart.indexOf(':')) : hostPart;
 
         for (Device d : devices) {
-            if (!d.pending && d.base().equals(url)) {
+            if (d.bound() && d.base().equals(url)) {
                 pendingScanIp = null;
                 toast("这台电视已经绑定过了");
                 openPanel(d);
@@ -842,11 +845,10 @@ public class MainActivity extends Activity {
         }
         Device target = findByIp(ip);
         if (target == null) {
-            target = new Device();
-            target.id = String.valueOf(System.currentTimeMillis());
-            target.name = "电视 " + ip.substring(ip.lastIndexOf('.') + 1);
+            target = newDevice(ip);
             devices.add(target);
         }
+        target.host = ip;
         target.url = url;
         target.pending = false;
         pendingScanIp = null;

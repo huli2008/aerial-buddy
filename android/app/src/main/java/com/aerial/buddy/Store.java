@@ -30,6 +30,7 @@ public final class Store {
                 d.id = o.optString("id");
                 d.name = o.optString("name");
                 d.url = o.optString("url");
+                d.host = o.optString("host");
                 d.pending = o.optBoolean("pending", false);
                 out.add(d);
             }
@@ -46,6 +47,7 @@ public final class Store {
                 o.put("id", d.id);
                 o.put("name", d.name);
                 o.put("url", d.url);
+                o.put("host", d.host == null ? "" : d.host);
                 o.put("pending", d.pending);
             } catch (Exception ignored) {
             }
