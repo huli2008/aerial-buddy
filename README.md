@@ -6,12 +6,12 @@
 
 **手机管电视：扫一下二维码就绑上，壁纸、屏保、装 App 全在手机上。**
 
-[Aerial 电视桌面](https://github.com/pengchujin/aerial-tv) 的配套遥控 App ——
 [Aerial 电视桌面](https://github.com/pengchujin/aerial-tv) 的配套管理 App —— **支持所有 Android TV**：
 
 TCL / 雷鸟走电视自带的「多屏互动」通道（这类固件禁用了 `adb install`）；
 小米 / 索尼 / 海信 / 创维 / 飞利浦 / Fire TV / Google TV 走 **ADB 推送**（电视开启网络调试即可）；
 任何 Android TV 都能用 **U 盘**兜底安装。
+
 Android 8.0+ · 单 APK 12.4 MB（**内置 Aerial guard 包** + 电视端助手）· MIT
 
 </div>
