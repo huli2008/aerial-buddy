@@ -48,14 +48,15 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 - **扫码绑定**：拍 / 选电视「控制中心 → 个性化」右侧的二维码，自动解析 `http://<IP>:8790/<token>/` 并保存。
 - **点卡片进管理**：直接打开这台电视自己的配置页（壁纸、图标、布局、儿童模式都在里头）。
 - **换壁纸**：原生列表列出电视上全部壁纸（航拍、我的视频轮播、每个自定义视频、每日一图、内置渐变），点一下 `POST api/wallpaper` 立刻切换。
+- **应用列表 / 卸载**：点「应用」列出电视上 Aerial 认得的应用（名称 + 包名），选中即可通过多屏互动卸载。
 - **安装 APK**：选手机里的 APK → 解析包名/版本 → 手机开临时 HTTP 服务 → T-Cast 推送到电视 → 电视上按「右键 → 同意」即装。
 - **毛玻璃 UI**：极光 / 夜幕 / 晨雾 三套主题。
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.3.0.apk](releases/aerial-buddy-v0.3.0.apk)**（约 375 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.4.0.apk](releases/aerial-buddy-v0.4.0.apk)**（约 378 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.3.0.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.4.0.apk>
 
 ## 使用
 
@@ -64,6 +65,14 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 3. 点这台电视的卡片 → 拍电视「个性化」页的二维码 → 自动授权并进入管理页；
 4. 管理页里「添加照片 / 添加视频」可直接从手机相册上传（WebView 文件选择已实现）；
 5. 回列表：点卡片进管理页；「壁纸」换壁纸；「安装 APK」推送安装。
+
+## 应用管理
+
+- **列表来源**：Aerial 的 `GET api/state` 里 `apps[]`（它在桌面上展示的全部应用，含被隐藏的），
+  每项包含 `key`（包名）、`label`（系统名）、`name`（自定义名）。
+- **卸载**：走多屏互动 `223>>UNINSTALL>>包名>>名称`，电视执行后回 `223>>UNINSTALL>>包名>>名称>>状态码`；
+  App 会再拉一次 `api/state` 核对包名是否消失，据此判断成功与否。
+- 系统应用 / 受固件保护的包可能卸载失败，App 会把电视返回的状态码一并提示。
 
 ## 它怎么和电视通信
 

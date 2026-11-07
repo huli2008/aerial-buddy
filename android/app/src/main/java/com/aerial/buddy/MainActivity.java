@@ -238,6 +238,7 @@ public class MainActivity extends Activity {
         acts.setOrientation(LinearLayout.HORIZONTAL);
         acts.setPadding(0, dp(9), 0, 0);
         acts.addView(chip("壁纸", () -> showWallpapers(d)));
+        acts.addView(chip("应用", () -> showApps(d)));
         acts.addView(chip("管理", () -> openPanel(d)));
         acts.addView(chip("安装 APK", () -> startInstall(d)));
         acts.addView(chip("刷新", () -> refresh(d)));
@@ -393,6 +394,80 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> toast("获取失败：" + e.getMessage()));
             }
         }, "wallpapers").start();
+    }
+
+    /** Lists the apps Aerial reports on this TV and offers T-Cast uninstall. */
+    private void showApps(final Device d) {
+        toast("读取应用列表…");
+        new Thread(() -> {
+            try {
+                final JSONObject s = AerialApi.state(d);
+                final org.json.JSONArray apps = s.optJSONArray("apps");
+                if (apps == null || apps.length() == 0) {
+                    runOnUiThread(() -> toast("电视没有返回应用列表"));
+                    return;
+                }
+                final String[] labels = new String[apps.length()];
+                final String[] keys = new String[apps.length()];
+                for (int i = 0; i < apps.length(); i++) {
+                    JSONObject a = apps.optJSONObject(i);
+                    keys[i] = a.optString("key");
+                    String custom = a.optString("name", "");
+                    String label = a.optString("label", keys[i]);
+                    labels[i] = (custom.isEmpty() ? label : custom) + "\n" + keys[i];
+                }
+                runOnUiThread(() -> new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("已安装应用 · " + apps.length() + " 个")
+                        .setItems(labels, (dlg, which) -> confirmUninstall(d, keys[which], labels[which]))
+                        .setNegativeButton("关闭", null)
+                        .show());
+            } catch (Exception e) {
+                runOnUiThread(() -> toast("获取失败：" + e.getMessage()));
+            }
+        }, "apps").start();
+    }
+
+    private void confirmUninstall(final Device d, final String pkg, String label) {
+        String shown = label.split("\n")[0];
+        new AlertDialog.Builder(this)
+                .setTitle("卸载 " + shown)
+                .setMessage(pkg + "\n\n通过电视的「多屏互动」执行；系统应用可能被固件保护而失败。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("卸载", (dlg, w) -> doUninstall(d, pkg, shown))
+                .show();
+    }
+
+    private void doUninstall(final Device d, final String pkg, final String label) {
+        toast("正在卸载…");
+        new Thread(() -> {
+            int code = Tcast.uninstall(d.ip(), pkg, label);
+            try {
+                Thread.sleep(1800);
+            } catch (InterruptedException ignored) {
+            }
+            boolean gone = false;
+            try {
+                JSONObject s = AerialApi.state(d);
+                org.json.JSONArray apps = s.optJSONArray("apps");
+                if (apps != null) {
+                    gone = true;
+                    for (int i = 0; i < apps.length(); i++) {
+                        if (pkg.equals(apps.optJSONObject(i).optString("key"))) {
+                            gone = false;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            final boolean ok = gone || code == 0;
+            final int c = code;
+            runOnUiThread(() -> {
+                if (ok) toast("已卸载 " + label);
+                else toast("卸载失败（电视返回 " + c + "）：系统应用或被固件保护");
+                refresh(d);
+            });
+        }, "uninstall").start();
     }
 
     private void openPanel(Device d) {

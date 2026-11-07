@@ -127,6 +127,53 @@ public final class Tcast {
         }
     }
 
+    /** Removes one package through 多屏互动. Returns the status code the TV reported, or -1 on timeout. */
+    public static int uninstall(String tvIp, String pkg, String label) {
+        Socket sock = null;
+        try {
+            sock = new Socket();
+            sock.connect(new InetSocketAddress(tvIp, PORT), 4000);
+            sock.setSoTimeout(800);
+            DataOutputStream out = new DataOutputStream(sock.getOutputStream());
+            DataInputStream in = new DataInputStream(sock.getInputStream());
+            send(out, "159>>1>>0");
+            send(out, "223>>UNINSTALL>>" + pkg + ">>" + label);
+            long deadline = System.currentTimeMillis() + 12_000L;
+            long lastBeat = System.currentTimeMillis();
+            byte[] lenBuf = new byte[4];
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    in.readFully(lenBuf);
+                    int n = ((lenBuf[0] & 0xff) << 24) | ((lenBuf[1] & 0xff) << 16)
+                            | ((lenBuf[2] & 0xff) << 8) | (lenBuf[3] & 0xff);
+                    if (n <= 0 || n > (1 << 20)) continue;
+                    byte[] body = new byte[n];
+                    in.readFully(body);
+                    String line = new String(body, StandardCharsets.UTF_8);
+                    String[] parts = line.split(">>");
+                    if (parts.length >= 5 && "223".equals(parts[0]) && "UNINSTALL".equals(parts[1])
+                            && pkg.equals(parts[2])) {
+                        return parseInt(parts[4]);
+                    }
+                } catch (java.net.SocketTimeoutException te) {
+                    // keep waiting
+                }
+                if (System.currentTimeMillis() - lastBeat > 5000) {
+                    send(out, "150>>");
+                    lastBeat = System.currentTimeMillis();
+                }
+            }
+            return -1;
+        } catch (Exception e) {
+            return -1;
+        } finally {
+            try {
+                if (sock != null) sock.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     /** Best-effort check that a file looks like an APK. */
     public static boolean looksLikeApk(File f) {
         return f != null && f.length() > 1024 && f.getName().toLowerCase().endsWith(".apk");
