@@ -239,10 +239,9 @@ public class MainActivity extends Activity {
         acts.setOrientation(LinearLayout.HORIZONTAL);
         acts.setPadding(0, dp(9), 0, 0);
         acts.addView(chip("壁纸", () -> showWallpapers(d)));
-        acts.addView(chip("应用", () -> showApps(d)));
+        acts.addView(chip("应用", () -> openApps(d)));
         acts.addView(chip("对讲", () -> showIntercom(d)));
         acts.addView(chip("管理", () -> openPanel(d)));
-        acts.addView(chip("安装 APK", () -> startInstall(d)));
         acts.addView(chip("刷新", () -> refresh(d)));
         card.addView(acts);
 
@@ -579,6 +578,13 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             toast("读取对讲端失败：" + e.getMessage());
         }
+    }
+
+    private void openApps(Device d) {
+        startActivity(new Intent(this, AppListActivity.class)
+                .putExtra("url", d.base())
+                .putExtra("name", d.name)
+                .putExtra("theme", theme.id));
     }
 
     private void openPanel(Device d) {

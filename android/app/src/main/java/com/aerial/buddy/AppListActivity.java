@@ -1,0 +1,332 @@
+package com.aerial.buddy;
+
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.LruCache;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/** 应用管理：图标 + 名称 + 包名 + 卸载按钮；底部「安装应用」。 */
+public class AppListActivity extends Activity {
+
+    private static final int REQ_APK = 31;
+
+    private final List<App> apps = new ArrayList<>();
+    private final ExecutorService pool = Executors.newFixedThreadPool(4);
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final LruCache<String, Bitmap> icons = new LruCache<>(120);
+
+    private Device device;
+    private Theme theme;
+    private AppAdapter adapter;
+    private TextView subtitle;
+
+    static class App {
+        String key;
+        String label;
+        long stamp;
+        String pkg;
+    }
+
+    @Override
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        device = new Device();
+        device.name = getIntent().getStringExtra("name");
+        device.url = getIntent().getStringExtra("url");
+        theme = Theme.of(getIntent().getIntExtra("theme", Theme.AURORA));
+
+        FrameLayout root = new FrameLayout(this);
+        root.addView(new Backdrop(this, theme), new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        page.setPadding(pad, dp(18), pad, dp(12));
+
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("应用管理");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        title.setTextColor(theme.text);
+        head.addView(title);
+        subtitle = new TextView(this);
+        subtitle.setText("  " + device.name);
+        subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        subtitle.setTextColor(theme.dim);
+        head.addView(subtitle);
+        page.addView(head);
+
+        ListView list = new ListView(this);
+        list.setDivider(null);
+        list.setDividerHeight(dp(8));
+        list.setPadding(0, dp(12), 0, dp(8));
+        list.setClipToPadding(false);
+        adapter = new AppAdapter();
+        list.setAdapter(adapter);
+        page.addView(list, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        TextView install = new TextView(this);
+        install.setText("＋  安装应用");
+        install.setGravity(Gravity.CENTER);
+        install.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        install.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        install.setTextColor(theme.accentText);
+        GradientDrawable ib = new GradientDrawable();
+        ib.setCornerRadius(dp(16));
+        ib.setColor(theme.accent);
+        install.setBackground(ib);
+        install.setOnClickListener(v -> pickApk());
+        page.addView(install, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+        root.addView(page, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+
+        load();
+    }
+
+    private void load() {
+        subtitle.setText("  " + device.name + " · 读取中…");
+        new Thread(() -> {
+            try {
+                JSONObject s = AerialApi.state(device);
+                JSONArray arr = s.optJSONArray("apps");
+                List<App> out = new ArrayList<>();
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject o = arr.optJSONObject(i);
+                        App a = new App();
+                        a.key = o.optString("key");
+                        String custom = o.optString("name", "");
+                        a.label = custom.isEmpty() ? o.optString("label", a.key) : custom;
+                        a.stamp = o.optLong("stamp", 0);
+                        a.pkg = a.key;
+                        out.add(a);
+                    }
+                }
+                main.post(() -> {
+                    apps.clear();
+                    apps.addAll(out);
+                    adapter.notifyDataSetChanged();
+                    subtitle.setText("  " + device.name + " · " + apps.size() + " 个应用");
+                });
+            } catch (Exception e) {
+                main.post(() -> {
+                    subtitle.setText("  " + device.name + " · 读取失败");
+                    toast("读取应用列表失败：" + e.getMessage());
+                });
+            }
+        }, "apps-load").start();
+    }
+
+    private void pickApk() {
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        i.setType("*/*");
+        startActivityForResult(Intent.createChooser(i, "选择 APK"), REQ_APK);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_APK || res != RESULT_OK || data == null || data.getData() == null) return;
+        try {
+            File f = new File(getCacheDir(), "install-" + System.currentTimeMillis() + ".apk");
+            InputStream in = getContentResolver().openInputStream(data.getData());
+            FileOutputStream out = new FileOutputStream(f);
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            out.close();
+            in.close();
+            Installer.push(this, device, f, (ok, msg) -> {
+                toast(msg);
+                if (ok) load();
+            });
+        } catch (Exception e) {
+            toast("读取 APK 失败：" + e.getMessage());
+        }
+    }
+
+    private void uninstall(final App a) {
+        new AlertDialog.Builder(this)
+                .setTitle("卸载 " + a.label)
+                .setMessage(a.pkg + "\n\n通过电视的「多屏互动」执行；系统应用可能被固件保护而失败。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("卸载", (dlg, w) -> {
+                    toast("正在卸载…");
+                    new Thread(() -> {
+                        int code = Tcast.uninstall(device.ip(), a.pkg, a.label);
+                        try {
+                            Thread.sleep(1500);
+                        } catch (InterruptedException ignored) {
+                        }
+                        main.post(() -> {
+                            toast(code == 0 ? ("已卸载 " + a.label) : ("卸载失败，电视返回 " + code));
+                            load();
+                        });
+                    }, "uninstall").start();
+                })
+                .show();
+    }
+
+    private void icon(final App a, final ImageView view) {
+        Bitmap cached = icons.get(a.key);
+        if (cached != null) {
+            view.setImageBitmap(cached);
+            return;
+        }
+        view.setImageBitmap(null);
+        pool.execute(() -> {
+            Bitmap bmp = null;
+            try {
+                String u = device.base() + "tile/" + Uri.encode(a.key) + "?v=" + a.stamp;
+                HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
+                c.setConnectTimeout(3000);
+                c.setReadTimeout(4000);
+                if (c.getResponseCode() == 200) {
+                    bmp = BitmapFactory.decodeStream(c.getInputStream());
+                }
+                c.disconnect();
+            } catch (Exception ignored) {
+            }
+            final Bitmap b = bmp;
+            if (b != null) {
+                icons.put(a.key, b);
+                main.post(() -> view.setImageBitmap(b));
+            }
+        });
+    }
+
+    private boolean isSystem(String pkg) {
+        return pkg.startsWith("com.tcl.") || pkg.startsWith("com.android.")
+                || pkg.startsWith("com.google.") || pkg.startsWith("com.mediatek.");
+    }
+
+    private void toast(String s) {
+        Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
+    }
+
+    private int dp(int v) {
+        return Math.round(getResources().getDisplayMetrics().density * v);
+    }
+
+    private final class AppAdapter extends BaseAdapter {
+        @Override
+        public int getCount() {
+            return apps.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return apps.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convert, ViewGroup parent) {
+            final App a = apps.get(position);
+            LinearLayout row = new LinearLayout(AppListActivity.this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(10), dp(10), dp(10));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(18));
+            bg.setColor(theme.card);
+            bg.setStroke(dp(1), theme.cardStroke);
+            row.setBackground(bg);
+
+            ImageView icon = new ImageView(AppListActivity.this);
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(44), dp(44));
+            ilp.rightMargin = dp(12);
+            row.addView(icon, ilp);
+            icon(a, icon);
+
+            LinearLayout text = new LinearLayout(AppListActivity.this);
+            text.setOrientation(LinearLayout.VERTICAL);
+            row.addView(text, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            LinearLayout nameRow = new LinearLayout(AppListActivity.this);
+            nameRow.setOrientation(LinearLayout.HORIZONTAL);
+            nameRow.setGravity(Gravity.CENTER_VERTICAL);
+            TextView name = new TextView(AppListActivity.this);
+            name.setText(a.label);
+            name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f);
+            name.setTextColor(theme.text);
+            name.setMaxLines(1);
+            nameRow.addView(name);
+            if (isSystem(a.pkg)) {
+                TextView tag = new TextView(AppListActivity.this);
+                tag.setText(" 系统");
+                tag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+                tag.setTextColor(theme.dim);
+                nameRow.addView(tag);
+            }
+            text.addView(nameRow);
+
+            TextView pkg = new TextView(AppListActivity.this);
+            pkg.setText(a.pkg);
+            pkg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            pkg.setTextColor(theme.dim);
+            pkg.setMaxLines(1);
+            text.addView(pkg);
+
+            TextView del = new TextView(AppListActivity.this);
+            del.setText("卸载");
+            del.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+            del.setTextColor(theme.text);
+            del.setPadding(dp(12), dp(7), dp(12), dp(7));
+            GradientDrawable db = new GradientDrawable();
+            db.setCornerRadius(dp(12));
+            db.setColor(theme.light ? Color.parseColor("#66FFFFFF") : Color.parseColor("#22FFFFFF"));
+            db.setStroke(dp(1), Color.parseColor("#66F2555A"));
+            del.setBackground(db);
+            del.setOnClickListener(v -> uninstall(a));
+            row.addView(del);
+            return row;
+        }
+    }
+}

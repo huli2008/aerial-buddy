@@ -48,15 +48,15 @@ Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，
 - **扫码绑定**：拍 / 选电视「控制中心 → 个性化」右侧的二维码，自动解析 `http://<IP>:8790/<token>/` 并保存。
 - **点卡片进管理**：直接打开这台电视自己的配置页（壁纸、图标、布局、儿童模式都在里头）。
 - **换壁纸**：原生列表列出电视上全部壁纸（航拍、我的视频轮播、每个自定义视频、每日一图、内置渐变），点一下 `POST api/wallpaper` 立刻切换。
-- **应用列表 / 卸载**：点「应用」列出电视上 Aerial 认得的应用（名称 + 包名），选中即可通过多屏互动卸载。
+- **应用管理页**：独立列表，每行是真实应用图标 + 名称 + 包名，右侧「卸载」按钮；「安装应用」固定在页面底部。
 - **安装 APK**：选手机里的 APK → 解析包名/版本 → 手机开临时 HTTP 服务 → T-Cast 推送到电视 → 电视上按「右键 → 同意」即装。
 - **对讲**：按住说话，电视喇叭同步出声（配 98 KB 电视端小助手，管家内可一键安装）。\n- **毛玻璃 UI**：极光 / 夜幕 / 晨雾 三套主题。
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.5.0.apk](releases/aerial-buddy-v0.5.0.apk)**（约 382 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.6.0.apk](releases/aerial-buddy-v0.6.0.apk)**（约 386 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.5.0.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.6.0.apk>
 
 ## 使用
 
