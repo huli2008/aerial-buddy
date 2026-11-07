@@ -10,7 +10,7 @@
 针对 **雷鸟（FFALCON）/ TCL** 电视做过实测：这类固件禁掉了 `adb install`，本 App 用电视自带的
 「多屏互动」通道把 APK 推过去安装。
 
-Android 5.0+ · 单 APK 374 KB · MIT
+Android 5.0+ · 单 APK 375 KB · MIT
 
 </div>
 
@@ -24,7 +24,23 @@ Android 5.0+ · 单 APK 374 KB · MIT
 | **TCL（m7642，Android 9）** | ✅ 实机验证 | 同上；此机型 `pm install` 被固件禁用，必须走多屏互动 |
 | 其他装了 Aerial 1.7+ 的 Android TV | ⚠️ 大部分可用 | 绑定与管理走 Aerial 的 8790 接口；「安装 APK」仅 TCL/雷鸟系固件可用 |
 
-> 前提：电视上已经装好 **Aerial**（本仓库不包含 Aerial），并且手机与电视在**同一 Wi-Fi**。
+> 前提：电视上已经装好 **Aerial**（见下一节），并且手机与电视在**同一 Wi-Fi**。
+
+## 先装 Aerial（guard 版）
+
+本 App 只负责「管理」和「推送安装」，**不包含 Aerial 本体**。电视上要先有 Aerial：
+
+👉 **[huli2008/aerial-guard-tcl](https://github.com/huli2008/aerial-guard-tcl)** —— 雷鸟 / TCL 专用 guard 包。
+Release 里的文件是 `Aerial-1.86-guard-TCL-MT5879.apk`（3,159,168 字节，SHA-256 `bb1e8bc6…5e36`）。
+
+装法（用本 App 完成）：
+
+1. 手机与电视连同一 Wi-Fi；
+2. 本 App「扫描」→ 点出现的电视 → 拍电视「个性化」页的二维码完成绑定；
+3. 点该电视卡片的「安装 APK」→ 选刚下载的 guard 包 → 电视上按「右键 → 同意」；
+4. 电视上打开 Aerial，按提示设为默认桌面。
+
+> 安装前建议核对哈希：Windows 用 `certutil -hashfile <apk> SHA256`，macOS/Linux 用 `shasum -a 256`。
 
 ## 功能
 
@@ -64,6 +80,20 @@ Android 5.0+ · 单 APK 374 KB · MIT
 电视自带的「多屏互动」以 system 身份安装，所以 App 直接说这套协议。
 **声明了 HOME 的 APK 会被 TCL 安装器拒绝**（Aerial 官方为此提供 guard 版），这是固件行为，无法绕过。
 
+## 与 aerial-guard-tcl 的分工
+
+| 仓库 | 负责 | 不负责 |
+|---|---|---|
+| **[aerial-guard-tcl](https://github.com/huli2008/aerial-guard-tcl)** | 分发 guard 安装包、版本与哈希、机型适配说明 | 传输与安装动作 |
+| **aerial-buddy**（本仓库） | 扫描绑定、T-Cast 推送安装、壁纸/屏保/应用管理 | 提供 Aerial 安装包 |
+
+| 场景 | 操作 |
+|---|---|
+| 第一次装 Aerial | 管家「安装 APK」→ 选 guard 包 |
+| 升级 Aerial | 下载新 tag 的 guard 包 → 管家再推一次（同签名可覆盖） |
+| 日常管理 | 卡片上：换壁纸 / 管理页 / 刷新状态 |
+| 换电视 | 「扫描」→ 点新电视 → 扫一次二维码 |
+
 ## 从源码构建
 
 需要 JDK 17 + Android build-tools + platform（不需要 Gradle）：
@@ -94,7 +124,7 @@ android/app/src/main/java/com/aerial/buddy/
 ## 已知限制
 
 - 扫码是「拍照 / 相册 + 解码」，不是实时取景。
-- 扫描只能找到 IP：token 只存在于二维码中（Aerial 对无 token 路径一律 404），所以绑定仍需扫一次码。
+- 扫描只能找到 IP：token 只存在于二维码中（Aerial 对无 token 路径一律 404），所以首次授权仍需扫一次码；之后每台电视都不用再扫。
 - 安装功能仅 TCL / 雷鸟系固件可用；其他品牌请用「管理」页或电视自带安装器。
 - 换路由 / 重装 Aerial 后 token 会变，需要重新扫码。
 
