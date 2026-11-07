@@ -195,17 +195,44 @@ public class AppListActivity extends Activity {
                     toast("正在卸载…");
                     new Thread(() -> {
                         int code = Tcast.uninstall(device.ip(), a.pkg, a.label);
-                        try {
-                            Thread.sleep(1500);
-                        } catch (InterruptedException ignored) {
+                        // 电视返回码含义未公开（实测不存在的包也返回 1），所以以"应用列表里还在不在"为准：
+                        // 连续轮询 5 次，包消失即成功。
+                        boolean gone = false;
+                        for (int i = 0; i < 5 && !gone; i++) {
+                            try {
+                                Thread.sleep(1200);
+                            } catch (InterruptedException ignored) {
+                            }
+                            gone = !stillInstalled(a.pkg);
                         }
+                        final boolean ok = gone;
+                        final int c = code;
                         main.post(() -> {
-                            toast(code == 0 ? ("已卸载 " + a.label) : ("卸载失败，电视返回 " + code));
+                            if (ok) {
+                                toast("已卸载 " + a.label);
+                            } else {
+                                toast("卸载失败（电视返回 " + c + "）：系统应用或被固件保护");
+                            }
                             load();
                         });
                     }, "uninstall").start();
                 })
                 .show();
+    }
+
+    /** True when the package still shows up in the TV's app list. */
+    private boolean stillInstalled(String pkg) {
+        try {
+            JSONObject s = AerialApi.state(device);
+            JSONArray apps = s.optJSONArray("apps");
+            if (apps == null) return true;
+            for (int i = 0; i < apps.length(); i++) {
+                if (pkg.equals(apps.optJSONObject(i).optString("key"))) return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return true; // 读不到就当还在，避免误报成功
+        }
     }
 
     private void icon(final App a, final ImageView view) {

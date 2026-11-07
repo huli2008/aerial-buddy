@@ -21,6 +21,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -128,7 +129,20 @@ public class MainActivity extends Activity {
         countView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         countView.setTextColor(theme.dim);
         countView.setPadding(dp(8), 0, 0, 0);
-        row.addView(countView);
+        row.addView(countView, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView about = new TextView(this);
+        about.setText("ⓘ 信息");
+        about.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        about.setTextColor(theme.text);
+        about.setPadding(dp(10), dp(5), dp(10), dp(5));
+        GradientDrawable ab = new GradientDrawable();
+        ab.setCornerRadius(dp(12));
+        ab.setColor(theme.light ? Color.parseColor("#14000000") : Color.parseColor("#22FFFFFF"));
+        about.setBackground(ab);
+        about.setOnClickListener(v -> showAbout());
+        row.addView(about);
         box.addView(row);
 
         TextView sub = new TextView(this);
@@ -219,43 +233,53 @@ public class MainActivity extends Activity {
         name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16.5f);
         name.setTextColor(theme.text);
         name.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        row.addView(name);
+        row.addView(name, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView badge = new TextView(this);
+        badge.setText(d.bound() ? "已绑定" : "未绑定");
+        badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
+        badge.setTextColor(d.bound() ? Color.parseColor("#38D39F") : theme.dim);
+        badge.setPadding(dp(8), dp(3), dp(8), dp(3));
+        GradientDrawable bb = new GradientDrawable();
+        bb.setCornerRadius(dp(9));
+        bb.setColor(theme.light ? Color.parseColor("#14000000") : Color.parseColor("#22FFFFFF"));
+        badge.setBackground(bb);
+        row.addView(badge);
+        card.addView(row);
 
         TextView ip = new TextView(this);
-        ip.setText("  " + d.host() + "  · 配置 8790 · 对讲 8766");
+        ip.setText(d.host() + "  ·  管理 8790  ·  对讲 8766  ·  同屏 8768");
         ip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
         ip.setTextColor(theme.dim);
-        row.addView(ip);
-        card.addView(row);
+        ip.setPadding(0, dp(4), 0, 0);
+        card.addView(ip);
 
         TextView status = new TextView(this);
         status.setText(d.status == null ? "未连接" : d.status);
         status.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        status.setTextColor(theme.dim);
-        status.setPadding(0, dp(7), 0, dp(2));
+        status.setTextColor(theme.text);
+        status.setPadding(0, dp(8), 0, 0);
         card.addView(status);
 
-        // 原有按钮全部保留，新增的「装 Aerial / 装对讲端 / 扫码绑定」追加在后面，
-        // 按钮多了以后整行可以左右滑动，不会因为放不下而被挤掉。
-        android.widget.HorizontalScrollView scroll = new android.widget.HorizontalScrollView(this);
-        scroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout acts = new LinearLayout(this);
-        acts.setOrientation(LinearLayout.HORIZONTAL);
-        acts.setPadding(0, dp(9), dp(4), 0);
-        acts.addView(chip("壁纸", () -> ifBound(d, () -> showWallpapers(d))));
-        acts.addView(chip("应用", () -> ifBound(d, () -> openApps(d))));
-        acts.addView(chip("对讲", () -> ifBound(d, () -> showIntercom(d))));
-        acts.addView(chip("管理", () -> ifBound(d, () -> openPanel(d))));
-        acts.addView(chip("装 Aerial", () -> installAerial(d)));
-        acts.addView(chip("安装 APK", () -> startInstall(d)));
-        acts.addView(chip("装对讲端", () -> installHelper(d)));
-        acts.addView(chip("扫码绑定", () -> {
-            pendingScanIp = d.ip();
-            captureQr();
-        }));
-        acts.addView(chip("刷新", () -> refresh(d)));
-        scroll.addView(acts);
-        card.addView(scroll);
+        // 双横排：上排是日常操作，下排是维护操作；原有按钮全部保留，只是分成两行不再横向滚动。
+        LinearLayout row1 = new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        row1.setPadding(0, dp(9), 0, 0);
+        row1.addView(chip("壁纸", () -> ifBound(d, () -> showWallpapers(d))));
+        row1.addView(chip("应用", () -> ifBound(d, () -> openApps(d))));
+        row1.addView(chip("对讲", () -> ifBound(d, () -> requireSponsor(() -> showIntercom(d)))));
+        row1.addView(chip("同屏", () -> openMirror(d)));
+        card.addView(row1);
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        row2.setPadding(0, dp(7), 0, 0);
+        row2.addView(chip("管理", () -> ifBound(d, () -> openPanel(d))));
+        row2.addView(chip("装 Aerial", () -> installAerial(d)));
+        row2.addView(chip("装对讲端", () -> installHelper(d)));
+        row2.addView(chip("刷新", () -> refresh(d)));
+        card.addView(row2);
 
         card.setOnClickListener(v -> openPanel(d));
         card.setOnLongClickListener(v -> {
@@ -674,6 +698,240 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             toast("读取对讲端失败：" + e.getMessage());
         }
+    }
+
+    /** 电视同屏到手机：走对讲端的 MJPEG 流（8768），不需要 Aerial token。 */
+    /** 同屏是赞助功能：未解锁先弹赞助页（含支付宝/微信二维码 + 设备码 + 解锁码输入）。 */
+    private void openMirror(final Device d) {
+        requireSponsor(() -> startMirror(d));
+    }
+
+    /** 不再做功能门禁：同屏/对讲直接可用，赞助入口在「信息」页。 */
+    private void requireSponsor(Runnable action) {
+        action.run();
+    }
+
+    /** 「信息」页：版本、开源地址、赞助收款码。 */
+    private void showAbout() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p = dp(18);
+        box.setPadding(p, dp(4), p, 0);
+
+        TextView ver = new TextView(this);
+        String vn;
+        try {
+            vn = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            vn = "?";
+        }
+        ver.setText("Aerial 管家  v" + vn + "\n手机端管理 Aerial 电视桌面：扫码绑定、壁纸、应用、对讲、同屏");
+        ver.setTextColor(theme.text);
+        ver.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+        box.addView(ver);
+
+        TextView links = new TextView(this);
+        links.setText("\n开源地址（长按复制）\n"
+                + "管家：github.com/huli2008/aerial-buddy\n"
+                + "Aerial 桌面：github.com/pengchujin/aerial-tv\n"
+                + "雷鸟/TCL guard 包：github.com/huli2008/aerial-guard-tcl");
+        links.setTextColor(theme.dim);
+        links.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f);
+        links.setTextIsSelectable(true);
+        box.addView(links);
+
+        TextView sponsor = new TextView(this);
+        sponsor.setText("\n如果这个 App 帮到了你，欢迎扫码赞助，金额随意 ☕");
+        sponsor.setTextColor(theme.text);
+        sponsor.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+        box.addView(sponsor);
+
+        LinearLayout qrs = new LinearLayout(this);
+        qrs.setOrientation(LinearLayout.HORIZONTAL);
+        qrs.setPadding(0, dp(10), 0, 0);
+        qrs.addView(qrImage("sponsor_alipay.jpg", "支付宝"), new LinearLayout.LayoutParams(0, dp(210), 1f));
+        qrs.addView(new View(this), new LinearLayout.LayoutParams(dp(10), 1));
+        qrs.addView(qrImage("sponsor_wechat.jpg", "微信"), new LinearLayout.LayoutParams(0, dp(210), 1f));
+        box.addView(qrs);
+
+        new AlertDialog.Builder(this)
+                .setTitle("信息与赞助")
+                .setView(box)
+                .setPositiveButton("关闭", null)
+                .show();
+    }
+
+    private void showSponsorDialog(final Runnable onUnlocked) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p = dp(18);
+        box.setPadding(p, dp(6), p, 0);
+
+        TextView tip = new TextView(this);
+        tip.setText("「同屏」和「对讲」是赞助功能。两种开通方式：\n"
+                + "· 在线购买兑换码（自动开通，一码一台电视）；\n"
+                + "· 或扫码赞助后把「设备码」发我，我回一个专属码。");
+        tip.setTextColor(theme.dim);
+        tip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+        box.addView(tip);
+
+        LinearLayout qrs = new LinearLayout(this);
+        qrs.setOrientation(LinearLayout.HORIZONTAL);
+        qrs.setPadding(0, dp(10), 0, 0);
+        qrs.addView(qrImage("sponsor_alipay.jpg", "支付宝"), new LinearLayout.LayoutParams(0, dp(190), 1f));
+        qrs.addView(new View(this), new LinearLayout.LayoutParams(dp(10), 1));
+        qrs.addView(qrImage("sponsor_wechat.jpg", "微信"), new LinearLayout.LayoutParams(0, dp(190), 1f));
+        box.addView(qrs);
+
+        final TextView buy = new TextView(this);
+        buy.setText("在线购买兑换码（自动开通）");
+        buy.setGravity(Gravity.CENTER);
+        buy.setTextColor(theme.accentText);
+        buy.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        GradientDrawable bb = new GradientDrawable();
+        bb.setCornerRadius(dp(14));
+        bb.setColor(theme.accent);
+        buy.setBackground(bb);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
+        blp.topMargin = dp(12);
+        box.addView(buy, blp);
+        buy.setOnClickListener(v -> {
+            String url = storeUrl();
+            if (url.isEmpty()) {
+                toast("还没配置购买链接：在 store_url.txt 里填，或联系作者");
+                return;
+            }
+            startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                    Uri.parse(url)));
+        });
+
+        final TextView code = new TextView(this);
+        code.setText("设备码：" + Unlock.deviceCode(this) + "\n（长按复制；长按两秒可设置授权服务器）");
+        code.setTextColor(theme.text);
+        code.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
+        code.setPadding(0, dp(12), 0, 0);
+        code.setTextIsSelectable(true);
+        code.setOnLongClickListener(v -> {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                    getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("device", Unlock.deviceCode(this)));
+            toast("设备码已复制");
+            showServerDialog();
+            return true;
+        });
+        box.addView(code);
+
+        final EditText input = new EditText(this);
+        input.setHint("输入兑换码 / 专属码");
+        input.setSingleLine(true);
+        box.addView(input);
+
+        new AlertDialog.Builder(this)
+                .setTitle("赞助后开启同屏与对讲")
+                .setView(box)
+                .setNegativeButton("关闭", null)
+                .setPositiveButton("解锁", (dlg, w) -> {
+                    final String typed = input.getText().toString();
+                    if (Unlock.checkLocal(MainActivity.this, typed)) {
+                        Unlock.setUnlocked(MainActivity.this, true);
+                        toast("已解锁，感谢赞助！");
+                        onUnlocked.run();
+                        return;
+                    }
+                    toast("正在向授权服务器校验…");
+                    new Thread(() -> {
+                        String err = Unlock.redeem(MainActivity.this, typed);
+                        runOnUiThread(() -> {
+                            if (err == null) {
+                                Unlock.setUnlocked(MainActivity.this, true);
+                                toast("兑换成功，已解锁同屏与对讲");
+                                onUnlocked.run();
+                            } else {
+                                toast(err);
+                            }
+                        });
+                    }, "redeem").start();
+                })
+                .show();
+    }
+
+    private String storeUrl() {
+        try {
+            java.io.InputStream in = getAssets().open("store_url.txt");
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(in, "UTF-8"));
+            String line = r.readLine();
+            r.close();
+            return line == null ? "" : line.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void showServerDialog() {
+        final EditText e = new EditText(this);
+        e.setHint("http://192.168.8.10:8787");
+        e.setText(Unlock.serverUrl(this));
+        e.setSingleLine(true);
+        new AlertDialog.Builder(this)
+                .setTitle("授权服务器地址")
+                .setMessage("填 tools/license-server.py 跑起来的那台机器的地址；留空则只能用手工专属码。")
+                .setView(e)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", (d, w) -> {
+                    Unlock.setServerUrl(this, e.getText().toString());
+                    toast("已保存");
+                })
+                .show();
+    }
+    /** A QR image with a caption under it. */
+    private LinearLayout qrImage(final String asset, String caption) {
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        ImageView iv = new ImageView(this);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        try {
+            java.io.InputStream in = getAssets().open(asset);
+            iv.setImageBitmap(BitmapFactory.decodeStream(in));
+            in.close();
+        } catch (Exception ignored) {
+        }
+        col.addView(iv, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        TextView c = new TextView(this);
+        c.setText(caption);
+        c.setGravity(Gravity.CENTER);
+        c.setTextColor(theme.dim);
+        c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        col.addView(c);
+        return col;
+    }
+
+    private void startMirror(final Device d) {
+        new Thread(() -> {
+            boolean ok;
+            try (java.net.Socket s = new java.net.Socket()) {
+                s.connect(new java.net.InetSocketAddress(d.ip(), MirrorServicePort.PORT), 1200);
+                ok = true;
+            } catch (Exception e) {
+                ok = false;
+            }
+            final boolean reachable = ok;
+            runOnUiThread(() -> {
+                if (!reachable) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("电视还没开始同屏")
+                            .setMessage("先在电视上打开「Aerial 对讲端」→ 点「投屏到手机（同屏）」→ 在电视上选「立即开始」。\n\n"
+                                    + "如果电视上还没装对讲端，先点卡片的「装对讲端」。")
+                            .setNegativeButton("知道了", null)
+                            .setPositiveButton("装对讲端", (dlg, w) -> installHelper(d))
+                            .show();
+                    return;
+                }
+                startActivity(new android.content.Intent(this, MirrorActivity.class)
+                        .putExtra("ip", d.ip()));
+            });
+        }, "mirror-probe").start();
     }
 
     private void openApps(Device d) {
