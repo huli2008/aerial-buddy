@@ -99,10 +99,9 @@ public final class Scanner {
 
     /** 2 = Aerial (8790 fingerprint), 1 = only 多屏互动/6553 (can still receive APKs), 0 = nothing. */
     private static int probe(String ip) {
-        if (probeTcast(ip)) {
-            if (probeAerial(ip)) return 2;
-            return 1;
-        }
+        // 8790 优先：装了 Aerial 的电视（哪怕不是 TCL/雷鸟、没有多屏互动）也要能被发现。
+        if (probeAerial(ip)) return 2;
+        if (probeTcast(ip)) return 1;
         return 0;
     }
 

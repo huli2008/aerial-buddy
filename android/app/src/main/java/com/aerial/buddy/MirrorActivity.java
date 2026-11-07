@@ -24,6 +24,7 @@ public class MirrorActivity extends Activity {
     private TextView home;
     private TextView status;
     private volatile boolean running = true;
+    private int retries;
     private Socket socket;
 
     @Override
@@ -76,12 +77,27 @@ public class MirrorActivity extends Activity {
     private void connect(final String ip) {
         new Thread(() -> {
             try {
+                // 先让电视尝试开启同屏（电视端可能还没开始推送），连不上再重试。
+                askTvToStartMirror(ip);
                 socket = new Socket();
-                socket.connect(new InetSocketAddress(ip, MirrorServicePort.PORT), 3000);
+                for (int i = 0; i < 4 && !running; i++) {
+                    try {
+                        socket.connect(new InetSocketAddress(ip, MirrorServicePort.PORT), 2000);
+                        break;
+                    } catch (Exception e) {
+                        try {
+                            socket.close();
+                        } catch (Exception ignored) {
+                        }
+                        socket = new Socket();
+                        if (i < 3) Thread.sleep(1200);
+                    }
+                }
                 socket.setSoTimeout(8000);
                 DataInputStream in = new DataInputStream(socket.getInputStream());
                 ui("已连接 · 等待电视画面");
                 int blackFrames = 0;
+                int frameNo = 0;
                 boolean warned = false;
                 while (running) {
                     int len = in.readInt();
@@ -90,25 +106,67 @@ public class MirrorActivity extends Activity {
                     in.readFully(jpeg);
                     final Bitmap bmp = BitmapFactory.decodeByteArray(jpeg, 0, len);
                     if (bmp == null) continue;
-                    boolean dark = isDark(bmp);
+                    boolean dark = (++frameNo % 5 == 0) && isDark(bmp);
                     if (dark) blackFrames++; else blackFrames = 0;
                     final boolean showWarning = blackFrames > 12 && !warned;
                     if (showWarning) warned = true;
                     runOnUiThread(() -> {
                         view.setImageBitmap(bmp);
                         if (showWarning) {
-                            status.setText("画面全黑：电视在 HDMI/机顶盒输入，系统截不到那一路画面");
+                            status.setText("画面全黑：电视停在 HDMI/电视输入，系统截不到那一路\\n已自动请求切回 Aerial 主页…");
                             home.setVisibility(android.view.View.VISIBLE);
+                            autoHome(ip);
                         } else {
                             status.setText("同屏中 · " + ip);
                         }
                     });
                 }
             } catch (Exception e) {
-                ui("连不上或已断开：" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())
-                        + "\n电视上打开「Aerial 对讲端」→ 点「投屏到手机」→ 允许后重试");
+                if (retries < 3) {
+                    retries++;
+                    ui("连不上（第 " + retries + "/3 次），正在请电视重新开始同屏…");
+                    autoHome(ip);
+                    requestMirrorStart(ip);
+                    try {
+                        Thread.sleep(2500);
+                    } catch (InterruptedException ignored) {
+                    }
+                    connect(ip);
+                    return;
+                }
+                ui("同屏连不上：电视端没有有效的录屏授权。\\n"
+                        + "请在电视上打开「Aerial 对讲端」→ 按「开始同屏」→ 系统弹窗选「立即开始」，然后重试。");
+
             }
         }, "mirror").start();
+    }
+
+    /** 全黑时自动请电视切回 Aerial 主页（助手 /home），避免一直黑屏。 */
+    /** 请电视端助手重新开始同屏。 */
+    private void requestMirrorStart(final String ip) {
+        new Thread(() -> {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                        new java.net.URL("http://" + ip + ":8769/mirror/start").openConnection();
+                c.setConnectTimeout(1500);
+                c.setReadTimeout(3000);
+                c.getInputStream().read(new byte[32]);
+                c.disconnect();
+            } catch (Exception ignored) {
+            }
+        }, "mirror-start").start();
+    }
+
+    private void autoHome(final String ip) {
+        new Thread(() -> {
+            try (java.net.Socket s = new java.net.Socket()) {
+                s.connect(new java.net.InetSocketAddress(ip, 8769), 1200);
+                java.io.OutputStream out = s.getOutputStream();
+                out.write(("GET /home HTTP/1.1\r\nHost: " + ip + "\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+                out.flush();
+            } catch (Exception ignored) {
+            }
+        }, "auto-home").start();
     }
 
     /** 采样 32x18 判断是不是全黑（HDMI 输入时 MediaProjection 只能拿到黑屏）。 */
@@ -124,6 +182,17 @@ public class MirrorActivity extends Activity {
             return sum / px.length < 12;
         } catch (Throwable t) {
             return false;
+        }
+    }
+
+    /** 请求电视端开同屏（8769 /mirror）。 */
+    private void askTvToStartMirror(String ip) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress(ip, 8769), 1500);
+            java.io.OutputStream out = s.getOutputStream();
+            out.write(("GET /mirror HTTP/1.1\r\nHost: " + ip + "\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+            out.flush();
+        } catch (Exception ignored) {
         }
     }
 

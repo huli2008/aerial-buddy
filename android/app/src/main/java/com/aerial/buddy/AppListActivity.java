@@ -91,6 +91,17 @@ public class AppListActivity extends Activity {
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
         subtitle.setTextColor(theme.dim);
         head.addView(subtitle);
+        TextView organize = new TextView(this);
+        organize.setText("整理");
+        organize.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        organize.setTextColor(theme.text);
+        organize.setPadding(dp(10), dp(5), dp(10), dp(5));
+        GradientDrawable obg = new GradientDrawable();
+        obg.setCornerRadius(dp(12));
+        obg.setColor(theme.light ? Color.parseColor("#14000000") : Color.parseColor("#22FFFFFF"));
+        organize.setBackground(obg);
+        organize.setOnClickListener(v -> toast("整理模式（拖动排序 / 隐藏）开发中，下个版本开放"));
+        head.addView(organize);
         page.addView(head);
 
         ListView list = new ListView(this);
@@ -150,9 +161,18 @@ public class AppListActivity extends Activity {
                     subtitle.setText("  " + device.name + " · " + apps.size() + " 个应用");
                 });
             } catch (Exception e) {
+                // Aerial 没运行 / 没绑定时，改问电视端小助手要包列表（不依赖 Aerial）。
+                List<App> viaHelper = loadFromHelper();
                 main.post(() -> {
-                    subtitle.setText("  " + device.name + " · 读取失败");
-                    toast("读取应用列表失败：" + e.getMessage());
+                    if (viaHelper == null || viaHelper.isEmpty()) {
+                        subtitle.setText("  " + device.name + " · 读取失败");
+                        toast("读取应用列表失败：" + e.getMessage());
+                        return;
+                    }
+                    apps.clear();
+                    apps.addAll(viaHelper);
+                    adapter.notifyDataSetChanged();
+                    subtitle.setText("  " + device.name + " · " + apps.size() + " 个应用（来自电视端）");
                 });
             }
         }, "apps-load").start();
@@ -184,6 +204,87 @@ public class AppListActivity extends Activity {
         } catch (Exception e) {
             toast("读取 APK 失败：" + e.getMessage());
         }
+    }
+
+    /** 让电视打开某个应用（电视端 8769 /launch）。 */
+    private void launchOnTv(final String pkg, final String label) {
+        toast("正在电视上打开 " + label);
+        new Thread(() -> {
+            try {
+                java.net.URL u = new java.net.URL("http://" + device.ip() + ":8769/launch?pkg="
+                        + java.net.URLEncoder.encode(pkg, "UTF-8"));
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) u.openConnection();
+                c.setConnectTimeout(3000);
+                c.setReadTimeout(4000);
+                java.io.InputStream in = c.getInputStream();
+                byte[] buf = new byte[2048];
+                int n = in.read(buf);
+                in.close();
+                String body = n > 0 ? new String(buf, 0, n, "UTF-8") : "";
+                c.disconnect();
+                main.post(() -> toast(body.contains("\"ok\":true") ? ("已在电视上打开 " + label)
+                        : "电视端拒绝了打开请求（可能是系统应用或无启动入口）"));
+            } catch (Exception e) {
+                main.post(() -> toast("打开失败：" + e.getMessage()));
+            }
+        }, "launch").start();
+    }
+
+    /** 电视端 GET :8769/apps —— 任何品牌都能用，只要装了电视端小助手。 */
+    private List<App> loadFromHelper() {
+        java.net.HttpURLConnection c = null;
+        try {
+            java.net.URL u = new java.net.URL("http://" + device.ip() + ":8769/apps");
+            c = (java.net.HttpURLConnection) u.openConnection();
+            c.setConnectTimeout(4000);
+            c.setReadTimeout(6000);
+            java.io.InputStream in = c.getInputStream();
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[16 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            in.close();
+            JSONObject o = new JSONObject(new String(bos.toByteArray(), "UTF-8"));
+            JSONArray arr = o.optJSONArray("apps");
+            if (arr == null) return null;
+            List<App> out = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject a = arr.optJSONObject(i);
+                App app = new App();
+                app.key = a.optString("pkg");
+                app.pkg = app.key;
+                app.label = a.optString("label", app.key);
+                app.stamp = 0; // 0 = 没有图标缓存，画首字母
+                out.add(app);
+            }
+            return out;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
+    }
+
+    /** 首字母头像，给没有图标的列表用。 */
+    private Bitmap letterIcon(String label) {
+        String key = "letter:" + label;
+        Bitmap cached = icons.get(key);
+        if (cached != null) return cached;
+        int size = Math.round(getResources().getDisplayMetrics().density * 44);
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas cv = new android.graphics.Canvas(bmp);
+        android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        int hue = Math.abs(label.hashCode()) % 360;
+        p.setColor(android.graphics.Color.HSVToColor(new float[]{hue, 0.45f, 0.75f}));
+        cv.drawCircle(size / 2f, size / 2f, size / 2f, p);
+        p.setColor(Color.WHITE);
+        p.setTextSize(size * 0.45f);
+        p.setTextAlign(android.graphics.Paint.Align.CENTER);
+        String ch = label.isEmpty() ? "?" : label.substring(0, 1).toUpperCase();
+        android.graphics.Paint.FontMetrics fm = p.getFontMetrics();
+        cv.drawText(ch, size / 2f, size / 2f - (fm.ascent + fm.descent) / 2f, p);
+        icons.put(key, bmp);
+        return bmp;
     }
 
     private void uninstall(final App a) {
@@ -309,7 +410,8 @@ public class AppListActivity extends Activity {
             LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(44), dp(44));
             ilp.rightMargin = dp(12);
             row.addView(icon, ilp);
-            icon(a, icon);
+            if (a.stamp == 0) icon.setImageBitmap(letterIcon(a.label));
+            else icon(a, icon);
 
             LinearLayout text = new LinearLayout(AppListActivity.this);
             text.setOrientation(LinearLayout.VERTICAL);
@@ -340,6 +442,22 @@ public class AppListActivity extends Activity {
             pkg.setTextColor(theme.dim);
             pkg.setMaxLines(1);
             text.addView(pkg);
+
+            TextView open = new TextView(AppListActivity.this);
+            open.setText("打开");
+            open.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+            open.setTextColor(theme.text);
+            open.setPadding(dp(12), dp(7), dp(12), dp(7));
+            GradientDrawable ob = new GradientDrawable();
+            ob.setCornerRadius(dp(12));
+            ob.setColor(theme.light ? Color.parseColor("#66FFFFFF") : Color.parseColor("#22FFFFFF"));
+            ob.setStroke(dp(1), theme.accent);
+            open.setBackground(ob);
+            open.setOnClickListener(v -> launchOnTv(a.pkg, a.label));
+            LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            olp.rightMargin = dp(6);
+            row.addView(open, olp);
 
             TextView del = new TextView(AppListActivity.this);
             del.setText("卸载");

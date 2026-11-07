@@ -13,11 +13,12 @@ public final class Theme {
     public final String name;
     public final int bgTop, bgBottom, glowA, glowB;
     public final int card, cardStroke, text, dim, accent, accentText;
+    public final int glass, glassStroke, scrim;
     public final boolean light;
 
     private Theme(int id, String name, int bgTop, int bgBottom, int glowA, int glowB,
                   int card, int cardStroke, int text, int dim, int accent, int accentText,
-                  boolean light) {
+                  boolean light, int glass, int glassStroke, int scrim) {
         this.id = id;
         this.name = name;
         this.bgTop = bgTop;
@@ -31,27 +32,33 @@ public final class Theme {
         this.accent = accent;
         this.accentText = accentText;
         this.light = light;
+        this.glass = glass;
+        this.glassStroke = glassStroke;
+        this.scrim = scrim;
     }
 
     public static final Theme[] ALL = new Theme[]{
             new Theme(AURORA, "极光",
                     Color.parseColor("#241A4F"), Color.parseColor("#0B1020"),
                     Color.parseColor("#7C5CFF"), Color.parseColor("#36C6F4"),
-                    Color.parseColor("#26FFFFFF"), Color.parseColor("#3DFFFFFF"),
+                    Color.parseColor("#1FFFFFFF"), Color.parseColor("#4DFFFFFF"),
                     Color.WHITE, Color.parseColor("#B9C0D4"),
-                    Color.parseColor("#7C5CFF"), Color.WHITE, false),
+                    Color.parseColor("#7C5CFF"), Color.WHITE, false,
+                    Color.parseColor("#33FFFFFF"), Color.parseColor("#59FFFFFF"), Color.parseColor("#99000000")),
             new Theme(MIDNIGHT, "夜幕",
                     Color.parseColor("#101A22"), Color.parseColor("#070A0E"),
                     Color.parseColor("#1F8A70"), Color.parseColor("#2D6CDF"),
-                    Color.parseColor("#1FFFFFFF"), Color.parseColor("#33FFFFFF"),
+                    Color.parseColor("#1AFFFFFF"), Color.parseColor("#45FFFFFF"),
                     Color.WHITE, Color.parseColor("#9AA7B4"),
-                    Color.parseColor("#38D39F"), Color.parseColor("#04221A"), false),
+                    Color.parseColor("#38D39F"), Color.parseColor("#04221A"), false,
+                    Color.parseColor("#33FFFFFF"), Color.parseColor("#52FFFFFF"), Color.parseColor("#99000000")),
             new Theme(MIST, "晨雾",
                     Color.parseColor("#EEF3FA"), Color.parseColor("#D9E3F0"),
                     Color.parseColor("#FFFFFF"), Color.parseColor("#BBD4F5"),
-                    Color.parseColor("#B3FFFFFF"), Color.parseColor("#E6FFFFFF"),
+                    Color.parseColor("#A6FFFFFF"), Color.parseColor("#F2FFFFFF"),
                     Color.parseColor("#1B2430"), Color.parseColor("#5A6B7E"),
-                    Color.parseColor("#3B82F6"), Color.WHITE, true)
+                    Color.parseColor("#3B82F6"), Color.WHITE, true,
+                    Color.parseColor("#D9FFFFFF"), Color.parseColor("#FFFFFFFF"), Color.parseColor("#66000000"))
     };
 
     public static Theme of(int id) {

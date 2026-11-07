@@ -46,6 +46,7 @@ public class IntercomService extends Service {
             return START_NOT_STICKY;
         }
         startForeground(NOTIFY_ID, notification());
+        ControlServer.start(getApplicationContext());
         if (!running) startServer();
         return START_STICKY;
     }

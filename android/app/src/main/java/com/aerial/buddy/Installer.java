@@ -18,7 +18,70 @@ public final class Installer {
     private Installer() {
     }
 
+    /** 有 T-Cast（6553）就走多屏互动，否则尝试 ADB（需要电视开启网络调试）。 */
     public static void push(final Activity act, final Device d, final File apk, final Done done) {
+        if (tcastOpen(d.ip())) {
+            pushTcast(act, d, apk, done);
+        } else {
+            pushAdb(act, d, apk, done);
+        }
+    }
+
+    private static boolean tcastOpen(String ip) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress(ip, 6553), 500);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void pushAdb(final Activity act, final Device d, final File apk, final Done done) {
+        final ProgressDialog pd = new ProgressDialog(act);
+        pd.setTitle("ADB 安装到 " + d.name);
+        pd.setMessage("正在连接 " + d.ip() + ":5555 …");
+        pd.setCancelable(false);
+        pd.show();
+        new Thread(() -> {
+            AdbClient adb = new AdbClient(null);
+            String result = null;
+            try {
+                if (!adb.connect(d.ip(), 5555, 4000)) {
+                    result = "连不上 " + d.ip() + ":5555（电视需开启「网络调试/ADB」）";
+                } else if (!adb.handshake(act.getFilesDir())) {
+                    result = "ADB 认证失败：电视上弹出「允许调试」时请用遥控器选择允许，然后重试";
+                } else {
+                    byte[] data = new byte[(int) apk.length()];
+                    try (java.io.InputStream in = new java.io.FileInputStream(apk)) {
+                        new java.io.DataInputStream(in).readFully(data);
+                    }
+                    // 复用已授权连接：一次授权，后面安装/按键都不再弹窗
+                    AdbSession session = AdbSession.get(d.ip());
+                    String out = session.ensure(act) ? session.exec("pm install -r -S " + data.length, data) : null;
+                    if (out == null || (!out.contains("Success") && !out.contains("成功"))) {
+                        // 回退：先 cat 到临时目录再安装
+                        session.exec("cat > /data/local/tmp/aerial.apk", data);
+                        out = session.exec("pm install -r /data/local/tmp/aerial.apk", null);
+                        session.exec("rm -f /data/local/tmp/aerial.apk", null);
+                    }
+                    result = (out != null && (out.contains("Success") || out.contains("成功")))
+                            ? null : ("安装失败：" + (out == null ? "无输出" : out.trim()));
+                }
+            } catch (Exception e) {
+                result = "ADB 异常：" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+            } finally {
+                adb.close();
+            }
+            final String msg = result;
+            act.runOnUiThread(() -> {
+                pd.dismiss();
+                if (msg == null) done.finished(true, "已通过 ADB 安装");
+                else done.finished(false, msg);
+            });
+        }, "adb-install").start();
+    }
+
+    private static void pushTcast(final Activity act, final Device d, final File apk, final Done done) {
         PackageManager pm = act.getPackageManager();
         PackageInfo info = pm.getPackageArchiveInfo(apk.getAbsolutePath(), 0);
         if (info == null) {
