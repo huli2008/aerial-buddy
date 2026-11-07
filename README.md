@@ -69,9 +69,9 @@ Aerial 本体由 [pengchujin/aerial-tv](https://github.com/pengchujin/aerial-tv)
 
 ## 下载
 
-**[⬇ aerial-buddy-v0.9.1.apk](releases/aerial-buddy-v0.9.1.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
+**[⬇ aerial-buddy-v0.9.2.apk](releases/aerial-buddy-v0.9.2.apk)**（约 474 KB，已签名，自签名需允许「仍要安装」）
 
-直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.9.1.apk>
+直链：<https://github.com/huli2008/aerial-buddy/raw/main/releases/aerial-buddy-v0.9.2.apk>
 
 ## 使用
 

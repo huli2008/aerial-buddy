@@ -235,38 +235,45 @@ public class MainActivity extends Activity {
         status.setPadding(0, dp(7), 0, dp(2));
         card.addView(status);
 
+        // 原有按钮全部保留，新增的「装 Aerial / 装对讲端 / 扫码绑定」追加在后面，
+        // 按钮多了以后整行可以左右滑动，不会因为放不下而被挤掉。
+        android.widget.HorizontalScrollView scroll = new android.widget.HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
         LinearLayout acts = new LinearLayout(this);
         acts.setOrientation(LinearLayout.HORIZONTAL);
-        acts.setPadding(0, dp(9), 0, 0);
-        if (d.bound()) {
-            acts.addView(chip("壁纸", () -> showWallpapers(d)));
-            acts.addView(chip("应用", () -> openApps(d)));
-            acts.addView(chip("对讲", () -> showIntercom(d)));
-            acts.addView(chip("装 Aerial", () -> installAerial(d)));
-            acts.addView(chip("刷新", () -> refresh(d)));
-        } else {
-            acts.addView(chip("装 Aerial", () -> installAerial(d)));
-            acts.addView(chip("装对讲端", () -> installHelper(d)));
-            acts.addView(chip("扫码绑定", () -> {
-                pendingScanIp = d.ip();
-                captureQr();
-            }));
-            acts.addView(chip("刷新", () -> refresh(d)));
-        }
-        card.addView(acts);
+        acts.setPadding(0, dp(9), dp(4), 0);
+        acts.addView(chip("壁纸", () -> ifBound(d, () -> showWallpapers(d))));
+        acts.addView(chip("应用", () -> ifBound(d, () -> openApps(d))));
+        acts.addView(chip("对讲", () -> ifBound(d, () -> showIntercom(d))));
+        acts.addView(chip("管理", () -> ifBound(d, () -> openPanel(d))));
+        acts.addView(chip("装 Aerial", () -> installAerial(d)));
+        acts.addView(chip("安装 APK", () -> startInstall(d)));
+        acts.addView(chip("装对讲端", () -> installHelper(d)));
+        acts.addView(chip("扫码绑定", () -> {
+            pendingScanIp = d.ip();
+            captureQr();
+        }));
+        acts.addView(chip("刷新", () -> refresh(d)));
+        scroll.addView(acts);
+        card.addView(scroll);
 
-        card.setOnClickListener(v -> {
-            if (d.bound()) {
-                openPanel(d);
-            } else {
-                startInstall(d);
-            }
-        });
+        card.setOnClickListener(v -> openPanel(d));
         card.setOnLongClickListener(v -> {
             confirmDelete(d);
             return true;
         });
         return card;
+    }
+
+    /** 未绑定时引导去扫码，而不是让依赖 token 的功能报错。 */
+    private void ifBound(Device d, Runnable r) {
+        if (d.bound()) {
+            r.run();
+            return;
+        }
+        toast("先扫码绑定这台电视，才能用壁纸/应用/对讲/管理");
+        pendingScanIp = d.ip();
+        captureQr();
     }
 
     private TextView chip(String label, Runnable r) {
