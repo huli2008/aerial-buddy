@@ -33,8 +33,11 @@ $resZip = Join-Path $work 'res.zip'
 & $aapt2 compile --dir (Join-Path $app 'res') -o $resZip
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 compile failed' }
 $base = Join-Path $work 'base.apk'
-& $aapt2 link -o $base --manifest (Join-Path $app 'AndroidManifest.xml') -I $Platform `
-      --java (Join-Path $work 'gen') --auto-add-overlay $resZip
+$assets = Join-Path $app 'assets'
+$aaptArgs = @('link', '-o', $base, '--manifest', (Join-Path $app 'AndroidManifest.xml'), '-I', $Platform,
+              '--java', (Join-Path $work 'gen'), '--auto-add-overlay', $resZip)
+if (Test-Path $assets) { $aaptArgs += @('-A', $assets) }
+& $aapt2 @aaptArgs
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 link failed' }
 
 Write-Host '2/6 compiling java'

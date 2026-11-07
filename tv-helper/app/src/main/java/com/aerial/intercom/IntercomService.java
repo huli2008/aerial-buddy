@@ -25,6 +25,9 @@ import java.net.Socket;
 public class IntercomService extends Service {
 
     public static final int PORT = 8766;
+    /** 8766 起依次尝试，直到绑定成功；手机端会在同一区间里探测。 */
+    public static final int[] PORTS = {8766, 8767, 8768, 8769, 8770, 8771, 8772, 8773, 8774, 8775};
+    public static volatile int activePort = PORT;
     public static final int SAMPLE_RATE = 16000;
     public static final String ACTION_START = "com.aerial.intercom.START";
     public static final String ACTION_STOP = "com.aerial.intercom.STOP";
@@ -49,9 +52,18 @@ public class IntercomService extends Service {
 
     private void startServer() {
         running = true;
+        startBeacon();
         acceptor = new Thread(() -> {
             try {
-                server = new ServerSocket(PORT);
+                for (int p : PORTS) {
+                    try {
+                        server = new ServerSocket(p);
+                        activePort = p;
+                        break;
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (server == null) return;
                 while (running) {
                     try (Socket s = server.accept()) {
                         play(s);
@@ -97,6 +109,36 @@ public class IntercomService extends Service {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    /** Announces "I am here, on this port" so the phone never has to guess. */
+    private void startBeacon() {
+        Thread t = new Thread(() -> {
+            try {
+                java.net.DatagramSocket s = new java.net.DatagramSocket();
+                s.setBroadcast(true);
+                byte[] payload = ("AERIAL-INTERCOM/1 " + PORT + " " + android.os.Build.MODEL)
+                        .getBytes("UTF-8");
+                java.net.DatagramPacket p = new java.net.DatagramPacket(
+                        payload, payload.length,
+                        java.net.InetAddress.getByName("255.255.255.255"), 8767);
+                while (running) {
+                    try {
+                        s.send(p);
+                    } catch (Exception ignored) {
+                    }
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+                s.close();
+            } catch (Exception ignored) {
+            }
+        }, "intercom-beacon");
+        t.setDaemon(true);
+        t.start();
     }
 
     private Notification notification() {

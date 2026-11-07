@@ -222,7 +222,7 @@ public class MainActivity extends Activity {
         row.addView(name);
 
         TextView ip = new TextView(this);
-        ip.setText("  " + d.host());
+        ip.setText("  " + d.host() + "  · 配置 8790 · 对讲 8766");
         ip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f);
         ip.setTextColor(theme.dim);
         row.addView(ip);
@@ -479,10 +479,20 @@ public class MainActivity extends Activity {
         box.setPadding(p, dp(12), p, dp(4));
 
         TextView tip = new TextView(this);
-        tip.setText("按住下面的按钮说话，电视喇叭会同步出声。\n首次使用需在电视上装一个「对讲端」（约 40 KB）。");
+        tip.setText("按住下面的按钮说话，电视喇叭会同步出声。\n"
+                + "首次使用需在电视上装一个「对讲端」（约 98 KB），装好后在电视上打开一次。");
         tip.setTextColor(theme.dim);
         tip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
         box.addView(tip);
+
+        final TextView probe = new TextView(this);
+        probe.setText("正在检测对讲端…");
+        probe.setTextColor(theme.dim);
+        probe.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        probe.setPadding(0, dp(10), 0, 0);
+        box.addView(probe);
+
+        final int[] port = {Intercom.PORT};
 
         final TextView hold = new TextView(this);
         hold.setText("按住说话");
@@ -513,6 +523,21 @@ public class MainActivity extends Activity {
         glp.topMargin = dp(10);
         box.addView(helper, glp);
 
+        final TextView testBtn = new TextView(this);
+        testBtn.setText("② 测试连接");
+        testBtn.setGravity(Gravity.CENTER);
+        testBtn.setTextColor(theme.text);
+        testBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        GradientDrawable tb2 = new GradientDrawable();
+        tb2.setCornerRadius(dp(14));
+        tb2.setColor(theme.card);
+        tb2.setStroke(dp(1), theme.cardStroke);
+        testBtn.setBackground(tb2);
+        LinearLayout.LayoutParams tlp2 = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        tlp2.topMargin = dp(10);
+        box.addView(testBtn, tlp2);
+
         final AlertDialog dlg = new AlertDialog.Builder(this)
                 .setTitle("对讲 · " + d.name)
                 .setView(box)
@@ -524,17 +549,31 @@ public class MainActivity extends Activity {
             installHelper(d);
         });
 
+
         hold.setOnTouchListener((v, ev) -> {
             switch (ev.getActionMasked()) {
                 case android.view.MotionEvent.ACTION_DOWN:
                     if (!checkMic()) return true;
-                    String err = intercom.start(d.ip());
-                    if (err != null) {
-                        toast(err);
-                    } else {
-                        hold.setText("正在说话…松开结束");
-                        hold.setBackgroundColor(0xFFB23B3B);
-                    }
+                    hold.setText("连接中…");
+                    intercom.startAsync(d.ip(), port[0], MainActivity.this, new Intercom.Cb() {
+                        @Override
+                        public void ready() {
+                            runOnUiThread(() -> {
+                                if (intercom.isActive()) {
+                                    hold.setText("正在说话…松开结束");
+                                    hold.setBackgroundColor(0xFFB23B3B);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void failed(final String message) {
+                            runOnUiThread(() -> {
+                                hold.setText("按住说话");
+                                toast(message);
+                            });
+                        }
+                    });
                     return true;
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL:
@@ -550,7 +589,48 @@ public class MainActivity extends Activity {
             }
         });
 
+        testBtn.setOnClickListener(v -> {
+            probe.setText("正在测试连接…");
+            new Thread(() -> {
+                String msg;
+                try (java.net.Socket s = new java.net.Socket()) {
+                    s.connect(new java.net.InetSocketAddress(d.ip(), port[0]), 2500);
+                    msg = "连接成功：" + d.ip() + ":" + port[0];
+                } catch (Exception e) {
+                    msg = "连接失败：" + e.getClass().getSimpleName() + " " + e.getMessage();
+                }
+                final String m = msg;
+                runOnUiThread(() -> {
+                    probe.setText(m);
+                    toast(m);
+                });
+            }, "intercom-test").start();
+        });
+
         dlg.show();
+
+        // 对讲端会每 3 秒发一次 UDP 广播，先听一下它用的是哪个端口；听不到再退回默认端口探测。
+        new Thread(() -> {
+            int found = Intercom.discover(d.ip(), 2500);
+            if (found <= 0) {
+                try (java.net.Socket s = new java.net.Socket()) {
+                    s.connect(new java.net.InetSocketAddress(d.ip(), Intercom.PORT), 1200);
+                    found = Intercom.PORT;
+                } catch (Exception ignored) {
+                }
+            }
+            final int foundPort = found;
+            runOnUiThread(() -> {
+                if (foundPort > 0) {
+                    port[0] = foundPort;
+                    probe.setText("● 对讲端在线（端口 " + foundPort + "）");
+                    probe.setTextColor(theme.text);
+                } else {
+                    probe.setText("○ 没检测到对讲端：先点下面「① 装对讲端到电视」并打开一次");
+                    probe.setTextColor(theme.dim);
+                }
+            });
+        }, "intercom-probe").start();
     }
 
     private boolean checkMic() {
